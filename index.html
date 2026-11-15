@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>艇魂 レーサー育成</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* 出走表（レース新聞）の紙面。罫線と枠番色で組む、片手で遊ぶ縦一列 */
+  color-scheme: light;
+  --paper:#eef2f3;
+  --card:#ffffff;
+  --ink:#10212e;
+  --sub:#5b6b76;
+  --rule:rgba(16,33,46,.16);
+  --water:#1f8aa6;
+  --water-soft:#cfe8ee;
+  --accent:#e0352b;
+  --b1:#ffffff; --b2:#1a1a1a; --b3:#e0352b; --b4:#1f5fd1; --b5:#f5c518; --b6:#1c9a4b;
+  --display:"Dela Gothic One","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-weight:500;font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#app{max-width:460px;margin:0 auto;min-height:100%;padding:14px 16px 28px;display:flex;flex-direction:column;gap:12px}
+h1,h2,.disp{font-family:var(--display);font-weight:400;text-wrap:balance;line-height:1.15}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+button:focus-visible,input:focus-visible{outline:3px solid var(--b4);outline-offset:2px}
+.btn{display:block;width:100%;padding:14px 16px;background:var(--ink);color:#fff;font-weight:900;font-size:16px;border-radius:6px;text-align:center}
+.btn.red{background:var(--accent)}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--ink)}
+.btn:active{transform:translateY(1px)}
+.card{background:var(--card);border:2px solid var(--ink);border-radius:6px}
+.rule{border-top:1px solid var(--rule)}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 6px;font-family:var(--display);font-size:14px;border:2px solid var(--ink);border-radius:4px}
+.c1{background:var(--b1);color:#111}.c2{background:var(--b2);color:#fff}.c3{background:var(--b3);color:#fff}
+.c4{background:var(--b4);color:#fff}.c5{background:var(--b5);color:#111}.c6{background:var(--b6);color:#fff}
+.sub{color:var(--sub);font-size:12.5px}
+
+/* タイトル */
+.title{flex:1;display:flex;flex-direction:column;gap:18px;padding-top:6vh}
+.title .lanes{display:flex;gap:0;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.title .lanes span{flex:1;height:54px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:24px;border-right:2px solid var(--ink)}
+.title .lanes span:last-child{border-right:none}
+.title h1{font-size:76px;letter-spacing:.04em}
+.title h1 small{display:block;font-size:19px;letter-spacing:.2em;margin-top:8px;color:var(--water)}
+.title p{max-width:30em}
+.best{padding:10px 12px;font-size:13.5px}
+.stack{display:flex;flex-direction:column;gap:10px}
+
+/* 作成 */
+label.f{font-weight:900;font-size:13px}
+input[type=text]{width:100%;padding:12px;font:inherit;font-size:17px;font-weight:700;border:2px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink)}
+.opt{display:flex;gap:12px;align-items:center;padding:12px;text-align:left;width:100%}
+.opt[aria-pressed=true]{background:var(--ink);color:#fff}
+.opt[aria-pressed=true] .sub{color:#c9d3d9}
+.opt b{display:block;font-size:16px}
+
+/* メイン */
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;border-bottom:3px solid var(--ink);padding-bottom:6px}
+.top .when{font-family:var(--display);font-size:22px}
+.next{font-size:12.5px;text-align:right;font-weight:700}
+.next b{color:var(--accent)}
+.racer{padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
+.racer .nm{font-weight:900;font-size:18px;overflow-wrap:anywhere}
+.hp{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;font-weight:700}
+.bar{height:10px;background:#dfe6e9;border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--water)}
+.bar.low i{background:var(--accent)}
+.stats{padding:4px 12px}
+.st{display:grid;grid-template-columns:5.2em 1fr 2.2em 1.8em;gap:8px;align-items:center;padding:7px 0}
+.st+.st{border-top:1px solid var(--rule)}
+.st span:first-child{font-weight:700;font-size:13.5px}
+.st .v{text-align:right;font-weight:700}
+.st .g{font-family:var(--display);font-size:17px;text-align:center}
+.cmds{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cmd{padding:10px 10px 9px;text-align:left;position:relative;min-height:66px}
+.cmd b{display:block;font-size:15.5px;font-weight:900}
+.cmd .sub{display:block;line-height:1.35;margin-top:2px}
+.cmd.wide{grid-column:1/-1;min-height:0}
+.cmd:active{background:var(--water-soft)}
+.cmd .mk{position:absolute;top:-9px;right:8px;background:var(--b5);border:2px solid var(--ink);border-radius:4px;font-size:11px;font-weight:900;padding:0 6px}
+.risk{color:var(--accent);font-weight:900}
+.log{font-size:13px;display:flex;flex-direction:column;gap:3px}
+.log p:first-child{font-weight:700}
+.log p+p{color:var(--sub)}
+
+/* モーダル */
+.ov{position:fixed;inset:0;background:rgba(16,33,46,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;z-index:5}
+.ov .card{width:100%;max-width:428px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ov h2{font-size:21px}
+
+/* レース */
+.rhead{border-bottom:3px solid var(--ink);padding-bottom:6px}
+.rhead h2{font-size:25px}
+.grade{display:inline-block;background:var(--ink);color:#fff;font-weight:900;font-size:12px;padding:1px 8px;border-radius:3px;margin-bottom:4px}
+table{width:100%;border-collapse:collapse}
+td,th{padding:8px 6px;text-align:left;font-size:14px;border-top:1px solid var(--rule)}
+th{font-size:11.5px;color:var(--sub);border-top:none;font-weight:700}
+tr.me td{background:var(--water-soft);font-weight:900}
+td.r{text-align:right}
+.clockwrap{display:flex;flex-direction:column;align-items:center;gap:10px}
+canvas{display:block;max-width:100%}
+.tap{height:120px;font-family:var(--display);font-size:30px;background:var(--accent);color:#fff;border-radius:6px;width:100%;border:2px solid var(--ink)}
+.tap{height:96px}
+.tap.idle{background:var(--ink)}
+.tap:disabled{background:#9aa6ad}
+.how{padding-left:1.5em;font-size:13.5px;display:flex;flex-direction:column;gap:3px}
+.slit{display:grid;grid-template-columns:auto 1fr 3.4em;gap:8px;align-items:center;padding:5px 0}
+.slit .bar{height:14px}
+.slit .t{font-weight:700;text-align:right}
+.big{font-family:var(--display);font-size:34px}
+.res{padding:12px;text-align:center}
+.tac{padding:11px 12px;text-align:left;width:100%;display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.tac b{font-size:16px;font-weight:900}
+.tac .p{font-family:var(--display);font-size:20px}
+.tac:active{background:var(--water-soft)}
+.grow{display:flex;flex-wrap:wrap;gap:6px 14px;font-weight:700;font-size:13.5px}
+.pic{display:block;width:100%;height:auto;aspect-ratio:16/9;border:2px solid var(--ink);border-radius:6px;background:var(--water-soft);object-fit:cover}
+.pic.banner{aspect-ratio:auto;height:92px}
+.scene{display:flex;flex-direction:column;gap:12px;flex:1}
+.scene h2{font-size:24px}
+.scene .tx{display:flex;flex-direction:column;gap:8px;font-size:15.5px}
+.scene .msg{font-weight:900}
+/* カットイン */
+.cut{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:rgba(16,33,46,.4);overflow:hidden}
+.cut .band{width:150%;flex:none;transform:rotate(-7deg);background-color:var(--ink);background-image:repeating-linear-gradient(90deg,transparent 0 26px,rgba(255,255,255,.08) 26px 29px);border-top:7px solid var(--b5);border-bottom:7px solid var(--b5);padding:20px 0 18px;text-align:center;color:#fff}
+.cut .band b{display:block;font-family:var(--display);font-weight:400;font-size:44px;line-height:1.1;letter-spacing:.04em}
+.cut .band span{display:block;font-weight:900;font-size:14px;margin-top:6px;color:var(--b5)}
+.cut.red .band{background-color:var(--accent)}
+.cut.red .band span{color:#fff}
+.cut.gold .band{background-color:var(--b5);color:var(--ink);border-color:var(--ink)}
+.cut.gold .band span{color:var(--ink)}
+.cut.dim .band{background-color:#5b6b76;border-color:#c9d3d9}
+.cut.dim .band span{color:#fff}
+@media (prefers-reduced-motion:no-preference){
+  .cut .band{animation:cutband 1.15s cubic-bezier(.2,.8,.2,1) both}
+  .cut .band b{animation:cuttext 1.15s linear both}
+  @keyframes cutband{0%{transform:translateX(-115%) rotate(-7deg)}16%,80%{transform:translateX(0) rotate(-7deg)}100%{transform:translateX(115%) rotate(-7deg)}}
+  @keyframes cuttext{0%{transform:translateX(60px)}16%{transform:translateX(8px)}80%{transform:translateX(-8px)}100%{transform:translateX(-60px)}}
+  .ov .card{animation:up .18s ease-out}
+  @keyframes up{from{transform:translateY(14px)}to{transform:none}}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+'use strict';
+var KEY='teikon-save', BEST='teikon-best';
+var MOODS=['絶不調','不調','普通','好調','絶好調'], MULT=[0.7,0.85,1,1.15,1.3];
+var STATS=[['st','スタート'],['tn','ターン'],['mt','整備'],['mn','メンタル']];
+var TRAIN={
+  st:{name:'スタート練習',hint:'スタート↑ 大時計の針が遅くなる',hp:20,g:{st:5,mn:1}},
+  tn:{name:'ターン練習',hint:'ターン↑ スタート少し↑',hp:26,g:{tn:4,st:1}},
+  mt:{name:'整備・ペラ調整',hint:'整備↑ 疲れにくい',hp:12,g:{mt:5}},
+  mn:{name:'座学・イメトレ',hint:'メンタル↑ 疲れにくい',hp:10,g:{mn:5}}
+};
+var STYLES={
+  in:{name:'イン屋',desc:'スタートで先手を取る。スタート+8 メンタル+4',g:{st:8,mn:4}},
+  mk:{name:'まくり屋',desc:'外から握って攻める。ターン+8 スタート+4',g:{tn:8,st:4}},
+  sb:{name:'整備の鬼',desc:'モーターを仕上げて勝つ。整備+10 メンタル+2',g:{mt:10,mn:2}}
+};
+var RACES={
+  6:{name:'養成所リーグ戦',grade:'養成所',R:30,prize:0},
+  12:{name:'修了記念競走',grade:'養成所',R:37,prize:0},
+  16:{name:'デビュー戦',grade:'一般',R:44,prize:60},
+  20:{name:'一般戦 優勝戦',grade:'一般',R:50,prize:100},
+  24:{name:'ルーキー戦 優勝戦',grade:'G3',R:56,prize:150},
+  28:{name:'地区選抜戦 優勝戦',grade:'G2',R:62,prize:450}
+};
+var SHARE=[1,.4,.27,.2,.15,.12], PTS=[10,8,6,4,2,1], CB=[16,7,5,3,0,-3];
+var RIVALS=['潮崎','真壁','戸波','千種','浦辺','大庭','磯貝','水無瀬','帆足','舵谷','早瀬','洲崎'];
+var EVENTS=[
+  {t:'同期の誘い',d:'同期が「夜の水面、空いてるぞ」と声をかけてきた。',c:[
+    ['一緒に乗る',function(){var k=pick(['st','tn']);add(k,2);hp(-12);return label(k)+'が2上がった。少し疲れた。';}],
+    ['断って寝る',function(){hp(12);return 'ぐっすり眠って体力が戻った。';}]]},
+  {t:'師匠のひとこと',d:'師匠が腕を組んでこちらを見ている。',c:[
+    ['「ペラを見てください」',function(){add('mt',3);return 'ペラの叩き方を教わった。整備が3上がった。';}],
+    ['「ターンを見てください」',function(){add('tn',2);return '旋回の姿勢を直された。ターンが2上がった。';}]]},
+  {t:'差し入れ',d:'食堂に山盛りの差し入れが届いた。',c:[
+    ['たくさん食べる',function(){hp(25);add('tn',-1);return '体力が大きく戻った。体が重くてターンが1下がった。';}],
+    ['控えめにする',function(){hp(10);add('mn',2);return '節制できた。メンタルが2上がった。';}]]},
+  {t:'強風の水面',d:'風速7m。水面は荒れて白波が立っている。',c:[
+    ['あえて乗る',function(){if(Math.random()<.5){add('tn',3);return '荒れ水面を乗りこなした。ターンが3上がった。';}hp(-25);return '波に叩かれて転覆。体力を大きく失った。';}],
+    ['見学する',function(){add('mn',2);return '先輩の走りを目に焼きつけた。メンタルが2上がった。';}]]},
+  {t:'スランプ',d:'どうも手応えがない。水面に出るのが少し怖い。',c:[
+    ['基本に戻る',function(){add('st',2);mood(-1);return '調子は落ちたが、スタートが2上がった。';}],
+    ['気分転換する',function(){mood(1);return '海を眺めて過ごした。調子が上向いた。';}]]},
+  {t:'ファンレター',pro:true,d:'「初めて舟券を買いました。応援しています」と書いてある。',c:[
+    ['返事を書く',function(){add('mn',3);return '背筋が伸びた。メンタルが3上がった。';}],
+    ['練習で応える',function(){add('st',2);mood(1);return 'スタートが2上がり、調子も上向いた。';}]]},
+  {t:'機嫌の悪いモーター',pro:true,d:'試運転でモーターの回転が上がらない。',c:[
+    ['整備室にこもる',function(){add('mt',4);hp(-8);return '部品を換えて立て直した。整備が4上がった。';}],
+    ['早めに切り上げる',function(){hp(12);return '割り切って体を休めた。';}]]}
+];
+
+/* ---------- じっくりモード：日程・絵・物語 ---------- */
+function last(){return S&&S.mode==='deep'?48:32;}
+var DEEP={
+  28:{name:'一般戦 優勝戦',grade:'一般',R:58,prize:100},
+  32:{name:'地区選抜戦 優勝戦',grade:'G2',R:62,prize:450},
+  36:function(k){return k==='A1'||k==='A2'?{name:'周年記念 優勝戦',grade:'G1',R:66,prize:1000}:{name:'一般戦 優勝戦',grade:'一般',R:58,prize:100};},
+  40:function(k){return k==='A1'||k==='A2'?{name:'ダイヤモンド戦 優勝戦',grade:'G1',R:68,prize:1000}:{name:'一般戦 優勝戦',grade:'一般',R:60,prize:100};},
+  44:function(k){return k==='A1'?{name:'頂上決戦 選考戦',grade:'SG',R:72,prize:1700}:k==='A2'?{name:'周年記念 優勝戦',grade:'G1',R:68,prize:1000}:{name:'一般戦 優勝戦',grade:'一般',R:60,prize:100};}
+};
+var RV_TURNS=[6,12,24,32,44,48];
+
+/* 絵。IMG に画像のパスを入れると、その場面は自前の画像に差し替わる */
+var IMG={};
+var SK='stroke="#10212e" stroke-width="2" stroke-linejoin="round"';
+function pa(d,f,ex){return '<path d="'+d+'" fill="'+f+'" '+(ex===undefined?SK:ex)+'/>';}
+function rc(x,y,w,h,f,ex){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+f+'" '+(ex||'')+'/>';}
+function ci(x,y,r,f,ex){return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+f+'" '+(ex===undefined?SK:ex)+'/>';}
+function gp(x,y,s,inner,rot){return '<g transform="translate('+x+' '+y+') rotate('+(rot||0)+') scale('+s+')">'+inner+'</g>';}
+function wav(y,col){var h='';for(var i=0;i<6;i++){var yy=y+8+i*14,x=(i*53)%90;h+='<path d="M'+x+' '+yy+' q12 -5 24 0 t24 0 M'+(x+140)+' '+(yy+5)+' q12 -5 24 0 t24 0" fill="none" stroke="'+col+'" stroke-width="2" stroke-linecap="round"/>';}return h;}
+function boatS(col){return '<path d="M-36 3 q-18 -3 -36 4 M-36 9 q-22 0 -42 9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/>'+
+  pa('M-30 6 L22 6 L34 -2 L-30 -2 Z',col)+pa('M2 -2 L13 -2 L8 -10 L2 -10 Z','#10212e')+pa('M-15 -2 L-13 -14 Q-11 -19 -4 -17 L0 -2 Z',col)+ci(-9,-22,5.5,'#fff')+rc(-35,-5,6,13,'#10212e');}
+function person(col,hair,opt){
+  var h=pa('M-13 0 L-11 -34 Q-11 -46 0 -46 Q11 -46 11 -34 L13 0 Z',col);
+  if(opt==='up')h+=pa('M-10 -40 L-23 -64 L-17 -67 L-5 -44 Z',col)+pa('M10 -40 L23 -64 L17 -67 L5 -44 Z',col);
+  h+=ci(0,-56,10,'#f1d2b6')+pa('M-10 -57 Q-11 -69 0 -69 Q11 -69 10 -57 Q0 -63 -10 -57 Z',hair||'#10212e');
+  if(opt==='helmet')h+=ci(18,-20,9,'#fff')+rc(12,-23,12,5,'#10212e');
+  if(opt==='cross')h+=pa('M-12 -32 L12 -32 L12 -23 L-12 -23 Z',col)+'<path d="M-12 -27.5 L12 -27.5" stroke="#10212e" stroke-width="2"/>';
+  return h;}
+function buoy(){return pa('M-7 0 L0 -22 L7 0 Z','#e0352b')+'<path d="M-4 -8 L4 -8" stroke="#fff" stroke-width="3"/>';}
+function prop(){var h='';[0,120,240].forEach(function(a){h+='<ellipse cx="0" cy="-19" rx="9" ry="19" transform="rotate('+a+')" fill="#f5c518" '+SK+'/>';});return h+ci(0,0,6,'#10212e');}
+function dots(col,n,seed){var h='';for(var i=0;i<n;i++){var x=(i*97+seed*31)%320,y=(i*53+seed*17)%120;h+=ci(x,y,2.5,col,'');}return h;}
+function shore(col){return pa('M0 80 L60 71 L130 77 L200 67 L320 75 L320 88 L0 88 Z',col,'')+rc(214,56,74,24,'#fff',SK)+rc(208,50,86,8,'#10212e')+rc(224,63,8,8,'#bfe6f2')+rc(240,63,8,8,'#bfe6f2')+rc(256,63,8,8,'#bfe6f2')+rc(272,63,8,8,'#bfe6f2');}
+var ART={
+  water:function(o){var s=(o&&o.season)||0,sky=['#e3f1f3','#bfe6f2','#f6dfc4','#e1e7ea'][s],sea=['#4aa7bd','#1f8aa6','#3b7f95','#6d98a6'][s];
+    return rc(0,0,320,180,sky)+(s===1?ci(60,34,16,'#f5c518'):s===2?ci(64,58,20,'#e9853a',''):'')+(s===0?dots('#f4b6c2',14,3):s===3?dots('#fff',18,5):'')+
+      shore('#5b6b76')+rc(0,86,320,94,sea)+wav(92,'rgba(255,255,255,.6)')+gp(248,116,.8,buoy())+gp(150,138,1.35,boatS('#fff'));},
+  gate:function(){return rc(0,0,320,180,'#e3f1f3')+rc(0,142,320,38,'#c9d3d9')+rc(78,62,170,80,'#fff',SK)+rc(70,54,186,10,'#10212e')+
+      [96,128,160,192,224].map(function(x){return rc(x,78,16,18,'#bfe6f2',SK);}).join('')+rc(150,108,26,34,'#5b6b76',SK)+
+      '<path d="M44 26 L44 142" stroke="#10212e" stroke-width="3"/>'+pa('M44 28 L74 36 L44 46 Z','#e0352b')+
+      rc(276,88,8,54,'#8a6f55',SK)+ci(280,70,28,'#f4b6c2')+dots('#f4b6c2',16,7)+
+      gp(112,172,.6,person('#fff'))+gp(140,172,.6,person('#e0352b'))+gp(168,172,.6,person('#1f5fd1'))+gp(196,172,.6,person('#f5c518'));},
+  rival:function(){return rc(0,0,320,180,'#f6dfc4')+ci(70,62,22,'#e9853a','')+shore('#7a5c4a')+rc(0,86,320,94,'#3b7f95')+wav(92,'rgba(255,230,190,.6)')+
+      gp(84,124,.8,boatS('#fff'))+rc(0,152,320,28,'#8a6f55',SK)+gp(222,174,1.8,person('#e0352b','#10212e','helmet'));},
+  master:function(){return rc(0,0,320,180,'#dfe6e9')+rc(0,142,320,38,'#9aa6ad')+gp(78,62,1.3,prop())+'<path d="M20 100 L150 100" stroke="#10212e" stroke-width="3"/>'+
+      rc(26,112,116,10,'#8a6f55',SK)+rc(32,122,8,20,'#8a6f55',SK)+rc(128,122,8,20,'#8a6f55',SK)+rc(40,102,22,10,'#e0352b',SK)+rc(70,98,30,14,'#10212e')+
+      gp(226,174,1.8,person('#5b6b76','#c9d3d9','cross'));},
+  pit:function(){return rc(0,0,320,180,'#dfe6e9')+rc(0,124,320,56,'#8a6f55',SK)+gp(112,92,2.3,prop())+
+      gp(190,150,1,rc(-4,-56,8,56,'#c9a27a',SK)+rc(-16,-70,32,16,'#5b6b76',SK),-38)+
+      rc(222,52,74,72,'#10212e')+rc(230,62,58,6,'#fff')+rc(230,74,58,6,'#fff')+rc(244,92,30,20,'#f5c518',SK);},
+  night:function(){return rc(0,0,320,180,'#10212e')+ci(58,34,14,'#f5e9a8','')+dots('#fff',16,2)+
+      pa('M262 16 L206 88 L318 88 Z','rgba(245,197,24,.22)','')+pa('M150 20 L96 88 L204 88 Z','rgba(245,197,24,.18)','')+
+      '<path d="M262 14 L262 88 M150 18 L150 88" stroke="#c9d3d9" stroke-width="3"/>'+rc(250,8,24,8,'#f5c518')+rc(138,12,24,8,'#f5c518')+
+      rc(0,86,320,94,'#123a52')+wav(92,'rgba(245,197,24,.45)')+gp(236,118,.8,buoy())+gp(140,140,1.35,boatS('#fff'));},
+  storm:function(){var r='';for(var i=0;i<22;i++){var x=(i*41)%330,y=(i*29)%90;r+='<path d="M'+x+' '+y+' l-8 16" stroke="#fff" stroke-width="2" stroke-linecap="round"/>';}
+    return rc(0,0,320,180,'#9aa6ad')+pa('M0 40 Q80 20 160 38 T320 30 L320 0 L0 0 Z','#5b6b76','')+r+
+      gp(170,108,1.3,boatS('#fff'),-16)+pa('M0 122 Q40 92 80 122 T160 122 T240 122 T320 122 L320 180 L0 180 Z','#3b6b7d','stroke="#fff" stroke-width="3"')+wav(134,'rgba(255,255,255,.5)');},
+  podium:function(){var c='',cols=['#e0352b','#1f5fd1','#f5c518','#1c9a4b','#fff'];for(var i=0;i<30;i++){c+='<rect x="'+((i*67)%316)+'" y="'+((i*43)%100)+'" width="5" height="9" fill="'+cols[i%5]+'" transform="rotate('+(i*37%90)+' '+((i*67)%316)+' '+((i*43)%100)+')"/>';}
+    return rc(0,0,320,180,'#e3f1f3')+c+rc(34,142,84,38,'#fff',SK)+rc(202,152,84,28,'#fff',SK)+rc(118,122,84,58,'#f5c518',SK)+
+      '<text x="160" y="164" text-anchor="middle" font-size="30" font-weight="900" fill="#10212e" font-family="sans-serif">1</text>'+
+      gp(76,142,.8,person('#1f5fd1'))+gp(244,152,.8,person('#1c9a4b'))+gp(160,122,1.05,person('#e0352b','#10212e','up'))+
+      pa('M150 34 L170 34 L167 50 Q160 56 153 50 Z','#f5c518')+rc(156,54,8,8,'#f5c518',SK);},
+  letter:function(){return rc(0,0,320,180,'#dfe6e9')+rc(0,128,320,52,'#c9a27a',SK)+gp(160,96,1,rc(-84,-52,168,104,'#fff',SK)+'<path d="M-84 -52 L0 12 L84 -52" fill="none" '+SK+'/>'+ci(0,14,11,'#e0352b'),-5)+
+      gp(262,150,1,rc(-3,-60,6,60,'#1f5fd1',SK)+pa('M-3 0 L3 0 L0 9 Z','#10212e'),24);},
+  news:function(){var l='';for(var i=0;i<6;i++)l+=rc(166,62+i*10,74,4,'#9aa6ad');for(var j=0;j<3;j++)l+=rc(78,128+j*10,162,4,'#9aa6ad');
+    return rc(0,0,320,180,'#c9d3d9')+gp(160,90,1,'<g transform="translate(-160 -90)">'+rc(62,14,196,154,'#fff',SK)+rc(76,28,168,20,'#10212e')+rc(76,60,80,58,'#bfe6f2',SK)+gp(120,98,.7,boatS('#e0352b'))+l+'</g>',-4);}
+};
+var ALT={water:'水面を走るボート',gate:'養成所の正門',rival:'桟橋に立つ鳴海',master:'整備場の灘',pit:'作業台のプロペラ',night:'ナイターの水面',storm:'荒れた水面',podium:'表彰台',letter:'机の上の手紙',news:'レース新聞'};
+function season(t){var m=((t+2)%12)+1;return m>=3&&m<=5?0:m>=6&&m<=8?1:m>=9&&m<=11?2:3;}
+function art(key,o){
+  if(IMG[key])return '<img class="pic'+(o&&o.banner?' banner':'')+'" src="'+IMG[key]+'" alt="'+ALT[key]+'">';
+  return '<svg class="pic'+(o&&o.banner?' banner':'')+'" viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice" role="img" aria-label="'+tx(ALT[key])+'">'+ART[key](o)+'</svg>';
+}
+
+/* 物語。月の頭に一度だけ流れる */
+var STORY={
+  1:{pic:'gate',t:'入所式',l:['山あいの水面に、養成所の朝礼台が立っている。','「1年後、ここを出られるのは半分だ」教官の灘 源造が言った。','隣の訓練生が小さく笑う。「半分も残るなら楽なもんだ」。それが鳴海 迅だった。']},
+  3:{pic:'rival',t:'鳴海という男',l:['スタート練習で、鳴海だけがコンマ05を並べている。','「お前、名前は」鳴海は水面を見たまま聞いてきた。'],c:[
+    ['「いつか前を走る」',function(){add('mn',3);return '鳴海は鼻で笑ったが、目は笑っていなかった。メンタルが3上がった。';}],
+    ['黙って練習に戻る',function(){add('st',3);return '悔しさを全部スタート練習にぶつけた。スタートが3上がった。';}]]},
+  5:{pic:'pit',t:'同期の帆足',l:['整備場の隅で、帆足 小春がプロペラを磨いている。','「乗るのは苦手だけど、ペラを触ってると落ち着くんだ。一緒にやる？」'],c:[
+    ['一緒にペラを磨く',function(){add('mt',3);return '帆足の手つきを真似た。整備が3上がった。';}],
+    ['走り込みに誘う',function(){hp(20);mood(1);return '二人で堤防を走った。体力が戻り、調子も上向いた。';}]]},
+  9:{pic:'master',t:'冬の特訓',l:['氷の張りそうな朝。灘がターンマークの横に立っている。','「ターンは腕で回すな。目で回せ。行き先を見ていない艇は回らん」'],c:[
+    ['日が暮れるまで回る',function(){add('tn',4);hp(-15);return '手の皮がむけた。ターンが4上がった。';}],
+    ['理屈を聞く',function(){add('mn',3);return '視線と艇の向きの話を書き留めた。メンタルが3上がった。';}]]},
+  11:{pic:'night',t:'修了前夜',l:['消灯後の寮。窓の外で、水面だけが明るい。','帆足がささやく。「明日の修了記念、鳴海くんに勝ってよ。みんなそう思ってる」'],fx:function(){mood(1);return '調子が上向いた。';}},
+  13:{pic:'gate',t:'卒業',l:['修了証を受け取った。来月からはプロだ。','灘が言う。「デビューしても俺の所に来い。ペラの叩き方くらいは教えてやる」','教官は、師匠になった。'],fx:function(){add('mt',2);return '整備が2上がった。';}},
+  17:{pic:'letter',t:'最初の手紙',l:['デビュー戦のあと、選手会経由で封筒が届いた。','「6号艇で外から攻めたのを見ました。次も買います」'],fx:function(){add('mn',2);return 'メンタルが2上がった。';}},
+  21:{pic:'news',t:'鳴海、G3を制す',l:['レース新聞の一面に、見慣れた横顔がある。','「同期最速。鳴海 迅、デビュー9か月で初優勝」'],c:[
+    ['「負けていられない」',function(){add('st',2);add('tn',2);hp(-10);return 'その足で水面に出た。スタートとターンが2ずつ上がった。';}],
+    ['「自分は自分だ」',function(){add('mn',4);return '新聞を畳んで、整備場に向かった。メンタルが4上がった。';}]]},
+  25:{pic:'storm',t:'帆足の転覆',l:['強風の日、帆足が1マークで転覆した。','大事には至らなかったが、しばらくレースを離れるという。'],c:[
+    ['見舞いに行く',function(){add('mn',3);hp(10);return '「戻るから、先に行ってて」と笑われた。メンタルが3上がった。';}],
+    ['練習を続ける',function(){add('tn',3);return '帆足の分も回った。ターンが3上がった。';}]]},
+  29:{pic:'master',t:'師匠の過去',l:['灘は現役のころ、頂上決戦の優勝戦でフライングを切った。','「あれで終わった。だが悔いはない。攻めて負けるのはいい。逃げて負けるな」'],fx:function(){add('mn',4);return 'メンタルが4上がった。';}},
+  33:{pic:'pit',t:'ペラ開眼',l:['灘の木槌を借りて、プロペラを叩く。','「どっちに仕上げる。決めるのはお前だ」'],c:[
+    ['直線が伸びる形に',function(){add('mt',3);add('st',2);return '整備が3、スタートが2上がった。';}],
+    ['回り足がつく形に',function(){add('mt',3);add('tn',2);return '整備が3、ターンが2上がった。';}]]},
+  37:{pic:'rival',t:'約束',l:['同じレース場で、鳴海と鉢合わせた。','「頂上決戦で待ってる。来られるならな」','初めて、鳴海がこちらの目を見て言った。'],fx:function(){mood(1);add('mn',2);return '調子が上向き、メンタルが2上がった。';}},
+  41:{pic:'master',t:'師匠の引退',l:['灘が養成所の教官を退いた。','最後の日、使い込んだ木槌を渡された。「もう俺より上手い。持っていけ」'],fx:function(){add('mt',4);return '整備が4上がった。';}},
+  45:{pic:'water',t:'帆足の復帰',l:['帆足が復帰戦で1着を取った。','ピットに戻るなり言う。「次はそっちの番。見てるからね」'],fx:function(){mood(2);return '調子が大きく上向いた。';}},
+  47:{pic:'night',t:'決戦前夜',l:['最終戦の前夜。宿舎の窓から、ナイターの灯りが見える。','出走表に、鳴海の名前がある。'],c:[
+    ['早く寝る',function(){hp(30);return '体力がしっかり戻った。';}],
+    ['スタートの感覚を確かめる',function(){add('st',3);return '大時計を頭の中で何度も回した。スタートが3上がった。';}]]}
+};
+STORY[15]={pic:'gate',t:'誰と走るか',l:['プロ1年目。練習の軸を決める時期だ。','ここでの選択で、この先に起きる出来事と結末が変わる。'],c:[
+  ['灘のもとで整備を極める',function(){S.route='m';add('mt',3);return '師匠の道を選んだ。整備が3上がった。';}],
+  ['鳴海を追って同じ水面に通う',function(){S.route='r';add('st',2);add('tn',2);return 'ライバルの道を選んだ。スタートとターンが2ずつ上がった。';}],
+  ['帆足と組んで支え合う',function(){S.route='f';hp(20);mood(1);add('mn',2);return '同期の道を選んだ。体力が戻り、メンタルが2上がった。';}]]};
+STORY[39]={route:{
+  m:{pic:'pit',t:'木槌の音',l:['灘が黙って、こちらの叩いたプロペラを水面にかざした。','「俺の現役のころより、いい音がする」'],c:[
+    ['もう一段、攻めた形に叩く',function(){add('mt',4);add('tn',1);return '整備が4、ターンが1上がった。';}],
+    ['今の形を磨き込む',function(){add('mt',2);add('mn',3);return '整備が2、メンタルが3上がった。';}]]},
+  r:{pic:'rival',t:'合同練習',l:['鳴海が初めて声をかけてきた。「一本、並んで走るか」','全速で1マークに飛び込む。隣で、鳴海が笑っていた。'],c:[
+    ['外から握って攻める',function(){add('st',3);add('tn',2);hp(-10);return 'スタートが3、ターンが2上がった。';}],
+    ['内で受けて立つ',function(){add('tn',3);add('mn',2);hp(-10);return 'ターンが3、メンタルが2上がった。';}]]},
+  f:{pic:'water',t:'二人の作戦ノート',l:['帆足が分厚いノートを開く。各レース場の風と潮が、びっしり書いてある。','「乗れない間、ずっと見てたから」'],c:[
+    ['風の読み方を教わる',function(){add('mn',4);add('st',1);return 'メンタルが4、スタートが1上がった。';}],
+    ['一緒に試運転に出る',function(){hp(15);mood(1);add('tn',2);return '体力が戻り、ターンが2上がった。';}]]}
+}};
+[[21,'r'],[37,'r'],[29,'m'],[33,'m'],[41,'m'],[25,'f'],[45,'f']].forEach(function(x){STORY[x[0]].who=x[1];});
+function scene(t){var x=STORY[t];return x&&x.route?x.route[S.route||'m']:x;}
+function bondFx(sc){if(!sc.who||sc.who!==S.route)return '';var k={m:'mt',r:'st',f:'mn'}[sc.who];add(k,2);return '絆の効果で'+label(k)+'がさらに2上がった。';}
+var EV_PIC=['night','master','gate','storm','night','letter','pit'];
+var EV_DEEP=[
+  {t:'地元紙の取材',deep:true,pro:true,pic:'news',d:'記者が聞く。「次の目標を教えてください」',c:[
+    ['「優勝します」',function(){mood(1);return '言い切ったら腹が据わった。調子が上向いた。';}],
+    ['「一走ずつです」',function(){add('mn',2);return '足元を見直した。メンタルが2上がった。';}]]},
+  {t:'早朝の水面',deep:true,pic:'water',d:'誰もいない水面に、朝日が差している。',c:[
+    ['スタート練習をする',function(){add('st',3);hp(-10);return '静かな水面で感覚を磨いた。スタートが3上がった。';}],
+    ['しばらく眺める',function(){mood(1);return '頭が空っぽになった。調子が上向いた。';}]]},
+  {t:'養成所の後輩',deep:true,pro:true,pic:'gate',d:'養成所から後輩が見学に来た。目が輝いている。',c:[
+    ['ターンを教える',function(){add('mn',3);return '教えるうちに自分の癖に気づいた。メンタルが3上がった。';}],
+    ['一緒に乗る',function(){add('tn',2);hp(-8);return '負けられずに本気で回った。ターンが2上がった。';}]]},
+  {t:'鳴海の背中',deep:true,pro:true,pic:'rival',d:'試運転の水面で、鳴海が一人で回っている。',c:[
+    ['旋回を目で盗む',function(){add('tn',3);return '艇の寝かせ方を覚えた。ターンが3上がった。';}],
+    ['自分の整備に戻る',function(){add('mt',2);return '黙って手を動かした。整備が2上がった。';}]]}
+];
+
+EV_PIC.forEach(function(k,i){EVENTS[i].pic=k;});EVENTS=EVENTS.concat(EV_DEEP);
+var S=null, R=null, raf=0, codeOpen=false, titleMsg='';
+var app=document.getElementById('app');
+
+function rnd(a,b){return a+Math.random()*(b-a);}
+function ri(a,b){return Math.floor(rnd(a,b+1));}
+function pick(a){return a[Math.floor(Math.random()*a.length)];}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function label(k){for(var i=0;i<4;i++)if(STATS[i][0]===k)return STATS[i][1];return k;}
+function add(k,v){S.stats[k]=clamp(Math.round(S.stats[k]+v),1,100);}
+function hp(v){S.hp=clamp(Math.round(S.hp+v),0,100);}
+function mood(v){S.mood=clamp(S.mood+v,0,4);}
+function log(t){S.log.unshift(t);S.log.length=Math.min(S.log.length,3);}
+function grade(v){var g='GFEDCBAS',i=clamp(Math.floor((v-10)/10),0,7);return g[i];}
+function gcol(v){var g=grade(v);return g==='S'?'c3':g==='A'?'c5':g==='B'?'c4':g==='C'?'c6':'c1';}
+function load(k){try{var v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}}
+function store(k,v){try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function save(){if(S&&S.screen==='main')store(KEY,S);}
+function enc(){var a=[S.name,S.style,S.turn,S.stats.st,S.stats.tn,S.stats.mt,S.stats.mn,S.hp,S.mood,S.money,S.pts,S.wins,S.races,S.fRest?1:0,S.sgWin?1:0,S.restWhy||'',S.mode==='deep'?'deep':'quick',S.rvW||0,S.rvL||0,S.seen||0,S.rvName||'',S.route||'',S.cls||'B2',S.per||[],S.genius?1:0,S.pers||''];
+  return btoa(unescape(encodeURIComponent(JSON.stringify(a))));}
+function dec(c){try{
+  var a=JSON.parse(decodeURIComponent(escape(atob(String(c).replace(/\s/g,'')))));
+  if(!STYLES[a[1]]||!(a[2]>=1&&a[2]<=(a[16]==='deep'?48:32)))return null;
+  function n(v,lo,hi){return clamp(Math.round(Number(v)||0),lo,hi);}
+  return {screen:'main',name:String(a[0]).slice(0,6)||'名無し',style:a[1],turn:n(a[2],1,48),mode:a[16]==='deep'?'deep':'quick',rvW:n(a[17],0,9),rvL:n(a[18],0,9),seen:n(a[19],0,48),story:null,rvName:String(a[20]||'').slice(0,6)||'鳴海',route:{m:'m',r:'r',f:'f'}[a[21]]||'',genius:!!a[24]||a[25]==='genius',pers:PERS[a[25]]?a[25]:'',cls:{B2:'B2',B1:'B1',A2:'A2',A1:'A1'}[a[22]]||'B2',per:(Array.isArray(a[23])?a[23]:[]).slice(0,6).map(function(v){return n(v,0,12);}),
+    stats:{st:n(a[3],1,100),tn:n(a[4],1,100),mt:n(a[5],1,100),mn:n(a[6],1,100)},hp:n(a[7],0,100),mood:n(a[8],0,4),money:n(a[9],0,99999),
+    pts:(Array.isArray(a[10])?a[10]:[]).slice(0,12).map(function(v){return n(v,0,12);}),wins:n(a[11],0,12),races:n(a[12],0,12),
+    fRest:!!a[13],sgWin:!!a[14],restWhy:String(a[15]||''),log:['セーブコードから再開した。'],spot:pick(Object.keys(TRAIN)),event:null};
+}catch(e){return null;}}
+
+function when(t){var y=Math.ceil(t/12),m=((t+2)%12)+1;return (t<=12?'養成所 ':'プロ'+(y-1)+'年目 ')+m+'月';}
+function avgPts(){if(!S.pts.length)return 0;var s=0;S.pts.forEach(function(p){s+=p;});return s/S.pts.length;}
+function klass(){return S.turn<=12?'訓練生':(S.cls||'B2');}
+function addPts(v){S.pts.push(v);(S.per=S.per||[]).push(v);}
+function review(){
+  var list=S.mode==='deep'?[24,32,40]:[20,24,28];
+  if(list.indexOf(S.turn)<0||!S.per||!S.per.length)return '';
+  var sum=0;S.per.forEach(function(p){sum+=p;});var avg=sum/S.per.length,o=['B2','B1','A2','A1'];
+  var tg=avg>=6.5?3:avg>=5?2:avg>=2.5?1:0,cur=Math.max(0,o.indexOf(S.cls||'B2')),nx=cur+(tg>cur?1:tg<cur?-1:0);
+  S.cls=o[nx];S.per=[];
+  var m='級別審査（今期勝率 '+avg.toFixed(2)+'）：'+(nx>cur?o[cur]+'から'+o[nx]+'に昇級。':nx<cur?o[cur]+'から'+o[nx]+'に降級。':o[nx]+'のまま。');
+  log(m);return m;
+}
+function raceAt(t){
+  var deep=S.mode==='deep',k;
+  if(t===last()){k=klass();
+    if(k==='A1')return {name:'頂上決戦 優勝戦',grade:'SG',R:deep?76:72,prize:4000};
+    if(k==='A2')return {name:'周年記念 優勝戦',grade:'G1',R:deep?70:66,prize:1000};
+    return {name:'一般戦 優勝戦',grade:'一般',R:deep?60:54,prize:100};}
+  if(deep&&DEEP[t])return typeof DEEP[t]==='function'?DEEP[t](klass()):DEEP[t];
+  return RACES[t]||null;
+}
+function nextRaceTurn(){for(var t=S.turn;t<=last();t++)if(raceAt(t))return t;return last();}
+function failRate(){return S.hp<60?Math.min(.9,(60-S.hp)*.015):0;}
+function slow(v){return v>=85?.3:v>=70?.5:v>=50?.7:1;}
+
+function cutin(main,kind,cb){
+  var d=document.createElement('div');d.className='cut '+(kind||'');d.setAttribute('role','status');
+  d.innerHTML='<div class="band"><b>'+esc(main)+'</b><span>'+(R?R.my+'号艇　':'')+esc(S.name)+'</span></div>';
+  document.body.appendChild(d);
+  setTimeout(function(){d.remove();if(cb)cb();},1150);
+}
+/* ---------- 進行 ---------- */
+function who(){return S.turn<=12?'教官':'師匠';}
+function rvn(){return esc((S&&S.rvName)||'鳴海');}
+function tx(t){return String(t).replace(/鳴海 迅|鳴海/g,rvn());}
+function grab(){var a=document.getElementById('nm'),b=document.getElementById('rv');if(a)S.name=a.value;if(b)S.rvName=b.value;}
+function checkStory(){if(S.mode==='deep'&&STORY[S.turn]&&(S.seen||0)<S.turn)S.story={msg:null};}
+function newGame(name,style,mode,rv,pers){
+  S={screen:'main',name:name||'名無し',style:style,turn:1,stats:{st:22,tn:22,mt:22,mn:22},hp:100,mood:2,money:0,
+     pts:[],wins:0,races:0,log:['ボートレーサー養成所に入所した。1年後の修了記念を目指す。'],spot:pick(Object.keys(TRAIN)),
+     fRest:false,event:null,sgWin:false,mode:mode==='deep'?'deep':'quick',rvW:0,rvL:0,seen:0,story:null,rvName:rv||'鳴海',cls:'B2',per:[],pers:PERS[pers]?pers:'calm',genius:pers==='genius'};
+  var g=STYLES[style].g;for(var k in g)add(k,g[k]);
+  if(S.genius){STATS.forEach(function(x){add(x[0],15);});log('天才として入所した。初期能力+15、練習の伸びは2割増し。');}
+  checkStory();save();render();
+  if(S.genius)cutin('天才！','gold');
+}
+function nextTurn(){
+  S.turn++;S.spot=pick(Object.keys(TRAIN));S.event=null;
+  if(S.turn>last()){finish();return;}
+  if(S.turn===13)log('養成所を修了。プロとしてデビューする。級別はB2から。級別審査で1段ずつ上がる。');
+  S.screen='main';checkStory();save();render();
+}
+function afterAction(){
+  var pool=EVENTS.map(function(e,i){return i;}).filter(function(i){return (!EVENTS[i].pro||S.turn>12)&&(!EVENTS[i].deep||S.mode==='deep');});
+  if(Math.random()<(S.mode==='deep'?.38:.3)&&!raceAt(S.turn+1)){S.event={i:pick(pool),msg:null};save();render();}
+  else nextTurn();
+}
+function train(k){
+  var t=TRAIN[k];
+  if(Math.random()<failRate()){
+    var d=pick(['st','tn','mt','mn']),bad=S.hp<25;
+    add(d,bad?-4:-2);mood(-1);hp(-5);
+    if(bad){S.fRest=true;S.restWhy='ケガの療養';}
+    log(t.name+'中に転覆。'+label(d)+'が'+(bad?4:2)+'下がり、調子も落ちた。'+(bad?'ケガで来月は動けない。':''));
+    afterAction();return;}
+  var m=moodMult()*(S.spot===k?1.3:1)*(S.hp<30?.6:1)*(S.pers==='hard'?1.1:1)*(S.genius?1.2:1),parts=[];
+  for(var s in t.g){var v=Math.max(1,Math.round((t.g[s]+(t.g[s]>=4?ri(-1,1):0))*m*slow(S.stats[s])));add(s,v);parts.push(label(s)+'+'+v);}
+  hp(-t.hp);
+  log(t.name+'：'+parts.join(' ')+(S.spot===k?'（'+who()+'の指導つき）':''));
+  afterAction();
+}
+function rest(){
+  hp(S.pers==='hard'?34:40);if(Math.random()<.4)mood(1);
+  if(S.fRest){var w=S.restWhy||'フライング休み',rc=raceAt(S.turn);S.fRest=false;S.restWhy='';
+    if(rc){if(S.turn>12)addPts(0);log(w+'で'+rc.name+'を欠場した。');review();}else log(w+'が明けた。');}
+  else log('休養して体力が戻った。');
+  afterAction();
+}
+function finish(){
+  var sum=0;STATS.forEach(function(s){sum+=S.stats[s[0]];});
+  var k=klass();
+  var title=S.sgWin?'艇王':k==='A1'?'トップレーサー':k==='A2'?'記念戦線の常連':k==='B1'?'中堅レーサー':'再起を誓う新人';
+  var score=sum*5+S.money+S.wins*100+(S.sgWin?2000:0);
+  S.end={k:k,title:title,score:score};
+  var b=load(BEST);if(!b||score>b.score)store(BEST,{score:score,title:title,name:S.name,k:k});
+  S.screen='end';store(KEY,null);render();
+}
+
+/* ---------- レース ---------- */
+function setupRace(){
+  var info=raceAt(S.turn),names=RIVALS.slice().sort(function(){return Math.random()-.5;});
+  var my=ri(1,6),boats=[];
+  for(var i=1;i<=6;i++){
+    var motor=Math.round(rnd(-5,7));
+    if(i===my)boats.push({no:i,course:i,me:true,name:S.name,motor:motor});
+    else{var st=clamp(.22-info.R/700+rnd(-.06,.06),.03,.4);
+      boats.push({no:i,course:i,me:false,name:names[i],motor:motor,st:Math.round(st*100)/100});}
+  }
+  if(S.mode==='deep'&&RV_TURNS.indexOf(S.turn)>=0){
+    var cand=boats.filter(function(b){return !b.me;}),rv=pick(cand);
+    rv.name=(S.rvName||'鳴海');rv.rv=true;rv.st=Math.max(.03,Math.round((rv.st-.02)*100)/100);rv.motor=Math.max(rv.motor,2);}
+  R={info:info,boats:boats,my:my,phase:'lot',lot:null};
+  S.screen='race';render();
+}
+var PERS={
+  bold:{name:'強気',desc:'まくり・まくり差し・全速ターンが決まりやすい。差しと逃げは少し苦手'},
+  calm:{name:'冷静',desc:'レースの運に振り回されにくい。フライングの判定が少し甘い'},
+  hard:{name:'努力家',desc:'練習の伸びが1割増し。休養の回復は少なめ'},
+  mood:{name:'お調子者',desc:'調子の影響が1.5倍。好調なら強く、不調なら弱い'},
+  genius:{name:'天才',desc:'初期能力が全部+15、練習の伸びが2割増し。ごくまれにしか現れない'}
+};
+function ES(k){return clamp(S.stats[k]*(1+((R&&R.mod)||0)),1,110);}
+function moodMult(){var m=MULT[S.mood];return S.pers==='mood'?1+(m-1)*1.5:m;}
+function capRate(){return S.hp<=0?.9:S.hp<20?(20-S.hp)*.02:0;}
+function reorder(){var o=R.boats.slice().sort(function(a,b){return b.pw-a.pw;});o.forEach(function(b,i){b.place=i+1;});R.order=o;}
+function lotRate(){return clamp((S.stats.mn-20)/100,0,.7);}
+function drawMotor(){
+  var a=Math.round(rnd(-5,7)),twice=Math.random()<lotRate(),b=twice?Math.round(rnd(-5,7)):a,v=Math.max(a,b);
+  R.boats[R.my-1].motor=v;
+  R.mod=v>=6?.12:v>=2?.06:v>=-2?0:-.08;
+  R.lot={no:ri(11,78),v:v,twice:twice,rate:Math.round(30+(v+5)*2.2),rank:v>=6?'◎ エース機':v>=2?'○ 上位機':v>=-2?'△ 中堅機':'× 下位機'};
+  if(v>=6)cutin('エース機！','gold',render);else render();
+}
+function byCourse(){return R.boats.slice().sort(function(a,b){return a.course-b.course;});}
+function grabRate(){return clamp(.35+(ES('mt')-50)/100+(ES('mn')-50)/400,.1,.9);}
+function grabCourse(){
+  if(R.busy)return;R.busy=true;
+  var me=R.boats[R.my-1],ok=Math.random()<grabRate(),from=me.course,to=ok?Math.max(1,from-(ES('mt')>=70?2:1)):Math.min(6,from+1);
+  var o=byCourse().filter(function(b){return !b.me;});o.splice(to-1,0,me);o.forEach(function(b,i){b.course=i+1;});
+  R.grabMsg=ok?(from+'コースから'+to+'コースを奪った。'):(to===from?'ピット離れで遅れたが、6コースは守った。':'ピット離れで遅れ、'+to+'コースに回された。');
+  R.pit={ok:ok};R.phase='pitanim';render();
+}
+function leadInfo(){
+  var me=R.boats[R.my-1],inn=R.boats.filter(function(b){return b.course<me.course;}),out=R.boats.filter(function(b){return b.course>me.course;}),v;
+  if(inn.length){v=0;inn.forEach(function(b){v+=b.st;});v=v/inn.length-me.st;return {inner:true,v:v};}
+  v=1;out.forEach(function(b){v=Math.min(v,b.st);});return {inner:false,v:v-me.st};
+}
+function tactics(){
+  var me=R.boats[R.my-1],s=S.stats,li=leadInfo(),lead=clamp(li.v,-.15,.2),c=me.course;
+  function f(k,w){return (ES(k)-50)/w;}
+  function P(x){return clamp(x,.05,.95);}
+  var nige={name:'逃げ',desc:'インから先に回って押し切る',key:'スタート・メンタル',p:P(.7+f('st',150)+f('mn',400)+lead*2.5),w:8,l:-6};
+  var full={name:'全速ターン',desc:'握ったまま回って突き放す',key:'ターン・整備',p:P(.42+f('tn',150)+f('mt',400)+lead*2.5),w:18,l:-12};
+  function sashi(b,w){return {name:'差し',desc:'内を小さく回って抜け出す',key:'ターン・メンタル',p:P(b+f('tn',150)+f('mn',400)+lead),w:w,l:-3};}
+  function makuri(b,w,l){return {name:'まくり',desc:'外から一気に叩く',key:'スタート・整備・内の艇とのST差',p:P(b+f('st',200)+f('mt',200)+lead*4),w:w,l:l};}
+  function ms(b){return {name:'まくり差し',desc:'艇の間を割って入る',key:'ターン・整備・メンタル',p:P(b+f('tn',200)+f('mt',400)+f('mn',400)+lead*2.5),w:15,l:-8};}
+  var L=c===1?[nige,full]:c===2?[sashi(.62,10),makuri(.24,20,-12)]:c===3?[sashi(.48,8),ms(.40),makuri(.26,22,-13)]:
+    c===4?[sashi(.42,8),ms(.40),makuri(.24,22,-13)]:c===5?[ms(.38),makuri(.20,22,-13),sashi(.28,6)]:[ms(.33),makuri(.16,22,-13),sashi(.20,6)];
+  if(S.pers==='bold')L.forEach(function(t){t.p=P(t.p+(/まくり|全速/.test(t.name)?.06:-.03));});
+  return L;
+}
+function resolve(tac){
+  if(R.busy)return;R.busy=true;
+  if(Math.random()<capRate()){R.capsize=true;cutin('転覆…','red',function(){R.busy=false;applyResult();R.phase='result';render();});return;}
+  var me=R.boats[R.my-1],ok=Math.random()<tac.p;
+  R.tacMsg=tac.name+(ok?'が決まった！':'は不発…');
+  R.boats.forEach(function(b,i){
+    var start=clamp((.2-b.st)*150,-40,30);
+    if(b.me)b.pw=CB[b.course-1]+start+ES('tn')*.35+ES('mt')*.3+ES('mn')*.1+(ok?tac.w:tac.l)+(S.mood-2)*(S.pers==='mood'?3:2)-Math.max(0,50-S.hp)*.3+rnd(-8,8)*(1-ES('mn')/200)*(S.pers==='calm'?.6:1);
+    else b.pw=CB[b.course-1]+start+R.info.R*.75+b.motor+rnd(-2,10)+rnd(-8,8)+(b.rv?5:0);
+  });
+  reorder();
+  var chance=me.place>=2&&ES('tn')>=50&&Math.random()<.4;
+  cutin(ok?tac.name+'！':'不発…',ok?'':'dim',function(){R.busy=false;R.phase=chance?'pass':'run';render();});
+}
+function applyResult(){
+  var me=R.boats[R.my-1],pro=S.turn>12,g=[];
+  S.races++;
+  var rvb=R.boats.filter(function(b){return b.rv;})[0];
+  if(R.flying||R.capsize){
+    if(pro)addPts(0);mood(-1);S.fRest=true;S.restWhy=R.capsize?'ケガの療養':'フライング休み';
+    log(R.info.name+(R.capsize?'で転覆して失格。ケガで来月は動けない。':'はフライングで失格。来月は出走できない。'));
+    R.gain='調子ダウン';
+    if(rvb)S.rvL=(S.rvL||0)+1;
+  }else{
+    var pl=me.place,prize=Math.round(R.info.prize*SHARE[pl-1]),up=pl===1?2:1;
+    if(pro)addPts(PTS[pl-1]+(R.info.grade==='SG'?2:R.info.grade==='G1'?1:0));
+    S.money+=prize;STATS.forEach(function(s){add(s[0],up);});
+    if(pl===1){S.wins++;mood(1);if(R.info.grade==='SG')S.sgWin=true;}
+    if(pl>=5)mood(-1);
+    hp(-15);
+    R.prize=prize;R.gain='全能力+'+up;
+    var rvt='';if(rvb){if(pl<rvb.place){S.rvW=(S.rvW||0)+1;rvt='鳴海に先着した。';}else{S.rvL=(S.rvL||0)+1;rvt='鳴海には届かなかった。';}}
+    R.rvt=rvt;
+    log(R.info.name+'は'+pl+'着。'+(prize?'賞金'+prize+'万円。':'')+rvt);
+  }
+  R.rev=review();
+}
+
+/* ---------- 描画 ---------- */
+function render(){
+  cancelAnimationFrame(raf);
+  if(!S){app.innerHTML=vTitle();return;}
+  if(S.screen==='create'){app.innerHTML=vCreate();return;}
+  if(S.screen==='main'){app.innerHTML=S.story?vScene():vMain();return;}
+  if(S.screen==='end'){app.innerHTML=vEnd();return;}
+  if(S.screen==='race'){
+    app.innerHTML=vRace();
+    if(R.phase==='clock')runClock();
+    if(R.phase==='run')runRace();
+    if(R.phase==='pitanim')runPit();
+    if(R.phase==='pass')runPass();
+  }
+}
+function lanes(){var h='';for(var i=1;i<=6;i++)h+='<span class="c'+i+'">'+i+'</span>';return '<div class="lanes" aria-hidden="true">'+h+'</div>';}
+function vTitle(){
+  var sv=load(KEY),b=load(BEST);
+  return '<div class="title">'+lanes()+
+  '<h1>艇魂<small>ボートレーサー育成</small></h1>'+
+  '<p>練習で能力を伸ばし、大時計に合わせてスタートを決め、1マークの勝負手を選ぶ。目指すは最高峰SGの優勝。短く遊ぶ「あっさり」と、物語と絵がつく「じっくり」を選べる。</p>'+
+  '<div class="stack">'+(sv?'<button class="btn red" data-a="resume">つづきから（'+esc(when(sv.turn))+'）</button>':'')+
+  '<button class="btn'+(sv?' ghost':' red')+'" data-a="start">はじめから</button></div>'+
+  '<div class="stack"><label class="f" for="incode">セーブコードで再開</label><input type="text" id="incode" placeholder="コードを貼り付け" autocomplete="off">'+
+  (titleMsg?'<p class="sub risk">'+titleMsg+'</p>':'')+'<button class="btn ghost" data-a="loadcode">コードから再開する</button></div>'+
+  (b?'<div class="card best">最高記録　<b>'+esc(b.name)+'</b>　'+esc(b.k)+'級「'+esc(b.title)+'」　<span class="num">'+b.score+'点</span></div>':'')+
+  '</div>';
+}
+function vCreate(){
+  var h='<div class="top"><div class="when">選手登録</div></div>'+
+  '<div class="stack"><label class="f" for="nm">登録名（6文字まで）</label><input type="text" id="nm" maxlength="6" value="'+esc(S.name)+'" autocomplete="off"></div>'+
+  '<div class="stack"><span class="f" style="font-weight:900;font-size:13px">タイプ</span>';
+  for(var k in STYLES)h+='<button class="card opt" data-a="style" data-k="'+k+'" aria-pressed="'+(S.style===k)+'"><span><b>'+STYLES[k].name+'</b><span class="sub">'+STYLES[k].desc+'</span></span></button>';
+  h+='</div><div class="stack"><span style="font-weight:900;font-size:13px">性格</span>';
+  for(var q in PERS)if(q!=='genius'||S.gOffer)h+='<button class="card opt" data-a="pers" data-k="'+q+'" aria-pressed="'+(S.pers===q)+'"><span><b>'+PERS[q].name+'</b><span class="sub">'+PERS[q].desc+'</span></span></button>';
+  h+='</div><div class="stack"><span style="font-weight:900;font-size:13px">モード</span>'+
+  '<button class="card opt" data-a="mode" data-k="quick" aria-pressed="'+(S.mode!=='deep')+'"><span><b>あっさり</b><span class="sub">全32か月・レース7戦。育成とレースだけをテンポよく</span></span></button>'+
+  '<button class="card opt" data-a="mode" data-k="deep" aria-pressed="'+(S.mode==='deep')+'"><span><b>じっくり</b><span class="sub">全48か月・レース11戦。ライバルと師匠の物語、絵つきのイベント</span></span></button>';
+  if(S.mode==='deep')h+='<label class="f" for="rv">ライバルの名前（6文字まで）</label><input type="text" id="rv" maxlength="6" value="'+esc(S.rvName===undefined?'鳴海':S.rvName)+'" autocomplete="off">';
+  return h+'</div><button class="btn red" data-a="go">入所する</button>';
+}
+function vScene(){
+  var st=scene(S.turn),h='<div class="scene"><div class="top"><div><div class="sub">'+when(S.turn)+'</div><div class="when">'+tx(st.t)+'</div></div></div>'+art(st.pic,{season:season(S.turn)})+'<div class="tx">';
+  if(S.story.msg)h+='<p class="msg">'+tx(esc(S.story.msg))+'</p></div><button class="btn" data-a="stok">次へ</button>';
+  else{h+=st.l.map(function(x){return '<p>'+tx(x)+'</p>';}).join('')+'</div>';
+    if(st.c){h+='<div class="stack">';st.c.forEach(function(c,i){h+='<button class="btn ghost" data-a="stc" data-k="'+i+'">'+tx(c[0])+'</button>';});h+='</div>';}
+    else h+='<button class="btn" data-a="stok">次へ</button>';}
+  return h+'</div>';
+}
+function vMain(){
+  var nt=nextRaceTurn(),ri_=raceAt(S.turn),isRace=S.turn===nt&&ri_,left=nt-S.turn,nr=raceAt(nt);
+  var h='<div class="top"><div><div class="sub num">'+S.turn+' / '+last()+'か月</div><div class="when">'+when(S.turn)+'</div></div>'+
+  '<div class="next">'+(isRace?'<b>今月レース</b>':'あと<b class="num">'+left+'</b>か月')+'<br>'+esc(nt===last()&&!isRace?'最終戦':nr.name)+'</div></div>';
+  if(S.mode==='deep')h+=art('water',{season:season(S.turn),banner:true});
+  h+='<div class="card racer"><div class="nm">'+esc(S.name)+'　<span class="sub">'+STYLES[S.style].name+(PERS[S.pers]?'・'+PERS[S.pers].name:'')+'</span>'+'</div>'+
+  '<div><span class="chip c'+(klass()==='A1'?3:klass()==='A2'?5:1)+'">'+klass()+'</span></div>'+
+  '<div class="sub" style="font-weight:700;color:var(--ink)">調子 '+MOODS[S.mood]+'　賞金 <span class="num">'+S.money+'</span>万円'+(S.pts.length?'　勝率 <span class="num">'+avgPts().toFixed(2)+'</span>':'')+'</div><div></div>'+
+  '<div class="hp"><span>体力</span><div class="bar'+(S.hp<50?' low':'')+'"><i style="width:'+S.hp+'%"></i></div><span class="num">'+S.hp+'</span></div></div>';
+  h+='<div class="card stats">';
+  STATS.forEach(function(s){var v=S.stats[s[0]];h+='<div class="st"><span>'+s[1]+'</span><div class="bar"><i style="width:'+v+'%"></i></div><span class="v num">'+v+'</span><span class="g chip '+gcol(v)+'">'+grade(v)+'</span></div>';});
+  h+='</div>';
+  if(isRace&&!S.fRest){
+    h+='<div class="card res"><span class="grade">'+ri_.grade+'</span><div class="big">'+esc(ri_.name)+'</div><p class="sub">'+(ri_.prize?'優勝賞金 '+ri_.prize+'万円':'成績は能力に反映される')+'</p></div>'+
+    (capRate()?'<p class="sub"><span class="risk">転覆の危険 '+Math.round(capRate()*100)+'%</span>　体力が尽きたまま出走すると転覆して失格になる。</p>':S.hp<50?'<p class="sub"><span class="risk">体力不足</span>　体力50未満で出走すると走りが鈍る。</p>':'')+'<button class="btn red" data-a="race">出走する</button>';
+  }else if(S.fRest){
+    h+='<div class="card res"><b>'+esc(S.restWhy||'フライング休み')+'</b><p class="sub">今月は練習もレースもできない。'+(ri_?'<span class="risk">'+esc(ri_.name)+'は欠場になる。</span>':'')+'</p></div><button class="btn" data-a="rest">休んで過ごす</button>';
+  }else{
+    var fr=Math.round(failRate()*100);
+    h+='<div class="cmds">';
+    for(var k in TRAIN){var t=TRAIN[k];h+='<button class="card cmd" data-a="train" data-k="'+k+'">'+(S.spot===k?'<span class="mk">'+who()+' 1.3倍</span>':'')+'<b>'+t.name+'</b><span class="sub">'+t.hint+'　体力-'+t.hp+'</span></button>';}
+    h+='<button class="card cmd wide" data-a="rest"><b>休養する</b><span class="sub">体力+'+(S.pers==='hard'?34:40)+'　調子が上向くことがある</span></button></div>';
+    if(fr)h+='<p class="sub"><span class="risk">転覆の危険 '+fr+'%</span>　体力60未満の練習は転覆しやすく、能力が下がる。25未満ならケガで1か月休み。</p>';
+  }
+  h+='<div class="rule"></div><div class="log">'+S.log.map(function(l){return '<p>'+tx(esc(l))+'</p>';}).join('')+'</div>';
+  h+='<button class="btn ghost" data-a="code" style="padding:9px;font-size:13.5px">セーブコードを出す</button>';
+  if(codeOpen){
+    h+='<div class="ov"><div class="card" role="dialog" aria-label="セーブコード"><h2>セーブコード</h2><p class="sub">このコードを控えておけば、タイトル画面の「セーブコードで再開」からいつでも続きができる。</p>'+
+    '<input type="text" id="code" readonly value="'+enc()+'" style="font-size:13px"><button class="btn" data-a="copy">コピーする</button><button class="btn ghost" data-a="codex">閉じる</button></div></div>';
+  }
+  if(S.event){
+    var e=EVENTS[S.event.i];
+    h+='<div class="ov"><div class="card" role="dialog" aria-label="'+tx(e.t).replace(/師匠/g,who())+'">'+(S.mode==='deep'&&e.pic?art(e.pic,{season:season(S.turn)}):'')+'<h2>'+tx(e.t).replace(/師匠/g,who())+'</h2>';
+    if(S.event.msg)h+='<p>'+tx(esc(S.event.msg))+'</p><button class="btn" data-a="evok">次の月へ</button>';
+    else{h+='<p>'+tx(e.d).replace(/師匠/g,who())+'</p>';e.c.forEach(function(c,i){h+='<button class="btn ghost" data-a="ev" data-k="'+i+'">'+c[0]+'</button>';});}
+    h+='</div></div>';
+  }
+  return h;
+}
+function chip(n){return '<span class="chip c'+n+'">'+n+'</span>';}
+function vRace(){
+  var h='<div class="rhead"><span class="grade">'+R.info.grade+'</span><h2>'+esc(R.info.name)+'</h2></div>';
+  if(R.phase==='lot'){
+    h+='<div class="card res"><p class="sub">モーター抽選</p>';
+    if(!R.lot)h+='<div class="big">？</div><p>このレースで使うモーターを抽選で決める。</p></div>'+
+      '<p class="sub">引きの強さ：メンタル <b>'+grade(S.stats.mn)+'</b>　<span class="num">'+Math.round(lotRate()*100)+'%</span>の確率で2回引いて、良い方を使える。</p>'+
+      '<button class="btn red" data-a="lot">抽選機を回す</button>';
+    else h+='<div class="big num">'+R.lot.no+'号機</div><p style="font-weight:900">'+R.lot.rank+'　2連率 <span class="num">'+R.lot.rate+'%</span></p>'+
+      '<p style="font-weight:900" class="'+(R.mod<0?'risk':'')+'">このレース中、全能力 '+(R.mod>0?'+':R.mod<0?'−':'±')+Math.abs(Math.round(R.mod*100))+'%</p>'+(R.lot.twice?'<p class="sub">引き直しが効いた。2回引いた良い方。</p>':'')+'</div>'+
+      '<p class="sub">◎は+12%、○は+6%、△は変化なし、×は−8%。大時計の針の速さや決まり手の成功率にも効く。</p><button class="btn red" data-a="lotok">出走表へ</button>';
+  }else if(R.phase==='card'){
+    h+='<div class="card" style="padding:4px 8px"><table><tr><th>枠</th><th>選手</th><th class="r">平均ST</th><th class="r">モーター2連率</th></tr>';
+    R.boats.forEach(function(b){
+      h+='<tr'+(b.me?' class="me"':'')+'><td>'+chip(b.no)+'</td><td>'+esc(b.name)+(b.rv?'　<span class="risk" style="font-size:11.5px">ライバル</span>':'')+'</td><td class="r num">'+(b.me?'-':'.'+String(Math.round(b.st*100)).padStart(2,'0'))+'</td><td class="r num">'+Math.round(30+(b.motor+5)*2.2)+'%</td></tr>';});
+    h+='</table></div><p class="sub">あなたは<b>'+R.my+'号艇</b>。内側のコースほど有利。次の画面で大時計を動かし、黄色い針が真上の0に来る瞬間にボタンを押す。</p>'+
+    (S.mode==='deep'&&R.my>1?(S.stats.mt>=50?
+      '<div class="stack"><button class="card tac" data-a="grab"><b>ピット離れで内を奪う</b><span class="p num">'+Math.round(grabRate()*100)+'%</span><span class="sub">成功で'+(S.stats.mt>=70?'2つ':'1つ')+'内のコースへ。失敗すると1つ外に回される<br>効く能力：整備・メンタル</span><span class="sub">成功率</span></button>'+
+      '<button class="btn red" data-a="pit">枠なりでピットを出る</button></div>'
+      :'<p class="sub">整備がC以上になると、ピット離れで内のコースを奪いにいける。</p><button class="btn red" data-a="pit">ピットを出る</button>')
+    :'<button class="btn red" data-a="pit">ピットを出る</button>');
+  }else if(R.phase==='pitanim'){
+    h+='<p style="font-weight:900;font-size:17px">ピット離れ</p><canvas id="pitcv"></canvas><p class="sub">6艇が一斉にピットを出る。</p>';
+  }else if(R.phase==='clock'){
+    h+='<p style="font-weight:900">進入：'+R.boats[R.my-1].course+'コース'+(R.grabMsg?'　<span class="sub">'+R.grabMsg+'</span>':'')+'</p>';
+    h+='<div class="clockwrap"><canvas id="clock" width="520" height="580" style="width:250px;height:279px"></canvas>'+
+    '<p id="cmsg" style="font-weight:900;font-size:13.5px;text-align:center">下のボタンで大時計を動かす</p></div>'+
+    '<button class="tap idle" id="tap">時計を動かす</button>'+
+    '<ol class="how"><li>「時計を動かす」を押すと、黄色い針が左から回り出す</li><li>針は1周と少し回る。1周目のあいだはボタンが押せない</li><li>針が真上の <b>0</b> に来た瞬間に「スタート！」を押す。0より早いとフライングで失格</li></ol>'+
+    '<p class="sub">針の速さ：スタート <b>'+grade(ES('st'))+'</b>'+(R.mod?'（モーター補正込み）':'')+'　スタートの能力が高いほど針がゆっくり回り、合わせやすい。</p>';
+  }else if(R.phase==='slit'){
+    var me=R.boats[R.my-1];
+    h+='<div class="card res"><p class="sub">あなたのスタートタイミング</p><div class="big num">'+(R.flying?'フライング':'ST .'+String(Math.round(me.st*100)).padStart(2,'0'))+'</div><p>'+R.stMsg+'</p></div>';
+    h+='<div class="card" style="padding:6px 10px">';
+    byCourse().forEach(function(b){var w=clamp((.45-b.st)/.45*100,4,100);
+      h+='<div class="slit">'+chip(b.no)+'<div class="bar"><i style="width:'+(b.me&&R.flying?100:w)+'%;'+(b.me?'background:var(--accent)':'')+'"></i></div><span class="t num">'+(b.me&&R.flying?'F':'.'+String(Math.round(b.st*100)).padStart(2,'0'))+'</span></div>';});
+    h+='</div>';
+    if(R.flying)h+='<button class="btn" data-a="fres">結果を見る</button>';
+    else{var li=leadInfo(),d=Math.abs(Math.round(li.v*100)),ds='.'+String(d).padStart(2,'0');
+      h+='<p class="sub">内側のコースから順に表示。'+(li.inner?(li.v>.005?'<b class="risk">内の艇より平均 '+ds+' 早い。</b>差が大きいほどまくりが決まりやすい。':li.v<-.005?'内の艇より平均 '+ds+' 遅い。まくりは届きにくい。':'内の艇とほぼ同じタイミング。'):(li.v>.005?'<b class="risk">外の最速艇より '+ds+' 早い。</b>逃げやすい。':li.v<-.005?'外の艇に '+ds+' 先行された。逃げは苦しい。':'外の艇とほぼ同じタイミング。'))+'</p>';
+      h+='<p style="font-weight:900">1マーク、どう攻める？</p><div class="stack">';
+      R.tacs.forEach(function(t,i){h+='<button class="card tac" data-a="tac" data-k="'+i+'"><b>'+t.name+'</b><span class="p num">'+Math.round(t.p*100)+'%</span><span class="sub">'+t.desc+'<br>効く能力：'+t.key+'</span><span class="sub">成功率</span></button>';});
+      h+='</div>';}
+  }else if(R.phase==='pass'){
+    var pm=R.boats[R.my-1],pt=R.order[pm.place-2];
+    h+='<p style="font-weight:900;font-size:17px">道中、'+pt.no+'号艇の'+esc(pt.name)+'に追いついた。</p><canvas id="passcv"></canvas>'+
+    '<p id="cmsg" style="font-weight:900;font-size:13.5px;text-align:center">印が緑の範囲に入った瞬間に押す</p><button class="tap" id="tap">差す！</button>'+
+    '<p class="sub">緑で押せば1つ前に出る。黄色は届かず、白は振り込んで1つ下がる。緑の範囲：ターン <b>'+grade(ES('tn'))+'</b>　ターンが高いほど広い。</p>';
+  }else if(R.phase==='run'){
+    h+='<p style="font-weight:900;font-size:17px">'+esc(R.tacMsg)+(R.passMsg?'　'+esc(R.passMsg):'')+'</p><canvas id="course"></canvas><button class="btn ghost" data-a="skip">結果へ</button>';
+  }else if(R.phase==='result'){
+    var m=R.boats[R.my-1];
+    h+='<div class="card res"><div class="big">'+(R.flying?'失格':R.capsize?'転覆':m.place+'着'+(m.place===1?'　優勝！':''))+'</div>'+
+    '<div class="grow" style="justify-content:center;margin-top:6px">'+(R.prize?'<span>賞金 +'+R.prize+'万円</span>':'')+'<span>'+R.gain+'</span></div>'+(R.rvt?'<p style="font-weight:900;margin-top:4px">'+tx(R.rvt)+'</p>':'')+(R.rev?'<p style="font-weight:900;margin-top:4px">'+R.rev+'</p>':'')+'</div>';
+    if(!R.flying&&!R.capsize){h+='<div class="card" style="padding:4px 8px"><table><tr><th>着</th><th>枠</th><th>選手</th><th class="r">ST</th></tr>';
+      R.order.forEach(function(b){h+='<tr'+(b.me?' class="me"':'')+'><td class="num">'+b.place+'</td><td>'+chip(b.no)+'</td><td>'+esc(b.name)+'</td><td class="r num">.'+String(Math.round(b.st*100)).padStart(2,'0')+'</td></tr>';});
+      h+='</table></div>';}
+    else h+='<p class="sub">'+(R.capsize?'体力が尽きたまま出走して、1マークで転覆した。来月はケガの療養になる。':'フライングは全額返還。来月はフライング休みになる。')+'</p>';
+    h+='<button class="btn red" data-a="rnext">'+(S.turn===last()?'最終評価を見る':'次の月へ')+'</button>';
+  }
+  return h;
+}
+function vEnd(){
+  var e=S.end,deep=S.mode==='deep',epi={'艇王':'表彰台の下で、鳴海が小さく手を挙げた。灘の木槌は、今も整備場の一番上の棚にある。','トップレーサー':'頂上決戦の常連になった。鳴海との勝負は、まだ決着がついていない。','記念戦線の常連':'記念レースで名前を呼ばれるようになった。頂上まで、あと一段。','中堅レーサー':'派手さはないが、舟券を買い続けてくれるファンがいる。','再起を誓う新人':'結果は出なかった。それでも灘は言う。「逃げて負けたわけじゃない。もう一度来い」'};
+  var h='<div class="title" style="padding-top:2vh">'+(deep?art(S.wins?'podium':'water',{season:2}):lanes())+'<div><p class="sub">'+esc(S.name)+' 選手の'+last()+'か月</p><h1 style="font-size:46px">'+esc(e.title)+'</h1>'+(deep?'<p style="margin-top:8px">'+tx(epi[e.title])+'</p><p style="margin-top:6px">'+tx({m:'灘は今も、レースのたびに整備場のラジオの前に座っている。',r:'鳴海とは、引退するその日まで同じ水面で競り合うことになる。',f:'帆足の作戦ノートは、もう三冊目に入った。'}[S.route||'m'])+'</p>':'')+'</div>'+
+  '<div class="card stats">';
+  STATS.forEach(function(s){var v=S.stats[s[0]];h+='<div class="st"><span>'+s[1]+'</span><div class="bar"><i style="width:'+v+'%"></i></div><span class="v num">'+v+'</span><span class="g chip '+gcol(v)+'">'+grade(v)+'</span></div>';});
+  h+='</div><div class="card" style="padding:4px 8px"><table>'+
+  '<tr><td>級別</td><td class="r"><b>'+e.k+'</b></td></tr>'+
+  '<tr><td>優勝</td><td class="r num">'+S.wins+'回 / '+S.races+'戦</td></tr>'+
+  (deep?'<tr><td>'+tx('鳴海との対戦')+'</td><td class="r num">'+(S.rvW||0)+'勝 '+(S.rvL||0)+'敗</td></tr>':'')+'<tr><td>獲得賞金</td><td class="r num">'+S.money+'万円</td></tr>'+
+  '<tr><td>総合点</td><td class="r num"><b>'+e.score+'点</b></td></tr></table></div>'+
+  '<button class="btn red" data-a="again">もう一度育てる</button></div>';
+  return h;
+}
+
+/* ---------- 大時計 ---------- */
+function runClock(){
+  var cv=document.getElementById('clock'),c=cv.getContext('2d'),btn=document.getElementById('tap'),msg=document.getElementById('cmsg');
+  var T=1200+ES('st')*14,D=T*1.25,LEAD=1000,t0=0,state='idle',done=false,PI=Math.PI;
+  function hand(a,col,len,w){c.save();c.rotate(a);c.beginPath();c.moveTo(-w/2,26);c.lineTo(w/2,26);c.lineTo(w/4,-len);c.lineTo(-w/4,-len);c.closePath();
+    c.fillStyle=col;c.fill();c.lineWidth=4;c.strokeStyle='#10212e';c.stroke();c.restore();}
+  function face(wa,ya,lamp){
+    c.clearRect(0,0,520,580);
+    [215,305].forEach(function(x){c.fillStyle='#10212e';c.fillRect(x-8,50,16,30);c.beginPath();c.arc(x,32,22,0,7);c.fillStyle=lamp?'#ff9d1e':'#7b8a94';c.fill();c.lineWidth=5;c.strokeStyle='#10212e';c.stroke();});
+    c.save();c.translate(260,322);
+    c.beginPath();c.arc(0,0,246,0,7);c.fillStyle='#fff';c.fill();c.lineWidth=8;c.strokeStyle='#10212e';c.stroke();
+    c.beginPath();c.arc(0,0,186,0,7);c.fillStyle='#10212e';c.fill();
+    c.fillStyle='#10212e';
+    for(var i=0;i<60;i++){c.save();c.rotate(i/60*PI*2);if(i%5)c.fillRect(-1.5,-242,3,9);else c.fillRect(-4,-242,8,16);c.restore();}
+    c.font='900 30px sans-serif';c.textAlign='center';c.textBaseline='middle';
+    for(var n=0;n<12;n++){var an=n/12*PI*2;c.fillText(String(n),Math.sin(an)*206,-Math.cos(an)*206+1);}
+    hand(wa,'#fff',168,18);
+    c.beginPath();c.moveTo(0,0);c.arc(0,0,184,PI,PI*1.5);c.closePath();c.fillStyle='#3a4b58';c.fill();c.lineWidth=3;c.strokeStyle='#9aa6ad';c.stroke();
+    hand(ya,'#f5a800',238,20);
+    c.beginPath();c.arc(0,0,18,0,7);c.fillStyle='#10212e';c.fill();c.lineWidth=4;c.strokeStyle='#9aa6ad';c.stroke();
+    c.restore();
+  }
+  function draw(now){
+    var wa=PI,ya=PI*1.5;
+    if(state!=='idle'){
+      var t=now-t0;
+      if(t<0)wa=PI+(1+t/LEAD)*PI/2;
+      else{wa=PI*1.5;ya=PI*1.5+(t/T)*PI*2;
+        if(state==='lead'&&t>T*.45){state='go';btn.disabled=false;btn.textContent='スタート！';btn.className='tap';msg.textContent='黄色い針が真上の 0 に来る瞬間に押す';}
+        if(t>D+1000){face(wa,ya,false);hit(D+1000);return;}}
+    }
+    face(wa,ya,state==='idle');
+    if(done)return;
+    raf=requestAnimationFrame(draw);
+  }
+  function begin(){state='lead';t0=performance.now()+LEAD;btn.disabled=true;btn.textContent='まだ押さない';btn.className='tap wait';msg.textContent='白い針から黄色い針にバトンタッチ。黄色い針は1周と少し回る';}
+  function hit(t){
+    if(done)return;done=true;btn.disabled=true;
+    var raw=(t-D)/1000,me=R.boats[R.my-1];
+    R.flying=false;
+    if(raw<-(S.pers==='calm'?.03:.01)){R.flying=true;me.st=0;R.stMsg='針が0に来る前に飛び出してしまった。';}
+    else if(raw<0){me.st=.01;R.stMsg='ぎりぎりで踏みとどまった。完璧なスタート。';}
+    else if(raw>=1){me.st=.6;R.stMsg='大きく出遅れた。';}
+    else{me.st=Math.max(.01,Math.round(raw*100)/100);R.stMsg=me.st<=.1?'鋭いスタートを決めた。':me.st<=.2?'まずまずのスタート。':'少し遅れた。';}
+    if(!R.flying)R.tacs=tactics();
+    function go(){R.phase='slit';render();}
+    if(R.flying)cutin('フライング','red',go);
+    else if(me.st<=.08)cutin('トップスタート！','',go);
+    else setTimeout(go,500);
+  }
+  function press(ev){ev.preventDefault();if(state==='idle')begin();else if(state==='go')hit(performance.now()-t0);}
+  btn.addEventListener('pointerdown',press);
+  btn.addEventListener('keydown',function(ev){if(ev.key===' '||ev.key==='Enter')press(ev);});
+  raf=requestAnimationFrame(draw);
+}
+
+/* ---------- 道中抜き ---------- */
+function runPass(){
+  var cv=document.getElementById('passcv'),btn=document.getElementById('tap'),W=Math.min(app.clientWidth-32,428),H=150,dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  var c=cv.getContext('2d');c.scale(dpr,dpr);
+  var me=R.boats[R.my-1],tg=R.order[me.place-2],bh=R.order[me.place]||null;
+  var COL=['#ffffff','#1a1a1a','#e0352b','#1f5fd1','#f5c518','#1c9a4b'];
+  var half=.05+ES('tn')*.0011,ctr=rnd(.35,.65),PER=950,MAXT=PER*3,t0=performance.now(),done=false,pos=0;
+  function boat(x,y,col,mine){c.fillStyle=col;c.strokeStyle='#10212e';c.lineWidth=mine?2.5:1.3;c.beginPath();c.moveTo(x+19,y);c.lineTo(x+8,y-8);c.lineTo(x-15,y-8);c.lineTo(x-15,y+8);c.lineTo(x+8,y+8);c.closePath();c.fill();c.stroke();
+    if(mine){c.strokeStyle='#e0352b';c.lineWidth=2;c.beginPath();c.arc(x,y,20,0,7);c.stroke();}}
+  function frame(now){
+    var t=now-t0,ph=(t/PER)%2;pos=ph<1?ph:2-ph;
+    c.fillStyle='#bfe1e8';c.fillRect(0,0,W,H);
+    c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1;for(var y=10;y<84;y+=14){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
+    c.fillStyle='#e0352b';c.strokeStyle='#10212e';c.lineWidth=2;c.beginPath();c.arc(W-46,30,7,0,7);c.fill();c.stroke();
+    boat(W*.62,52,COL[tg.no-1],false);boat(W*.62-58+pos*34,66-pos*18,COL[me.no-1],true);
+    var bx=16,bw=W-32,by=104,bhh=22;
+    c.fillStyle='#fff';c.strokeStyle='#10212e';c.lineWidth=2;c.fillRect(bx,by,bw,bhh);c.strokeRect(bx,by,bw,bhh);
+    c.save();c.beginPath();c.rect(bx+1,by+1,bw-2,bhh-2);c.clip();
+    c.fillStyle='#f5c518';c.fillRect(bx+(ctr-half*2.5)*bw,by,half*5*bw,bhh);
+    c.fillStyle='#1c9a4b';c.fillRect(bx+(ctr-half)*bw,by,half*2*bw,bhh);c.restore();
+    c.strokeStyle='#10212e';c.strokeRect(bx,by,bw,bhh);
+    var px=bx+pos*bw;c.fillStyle='#10212e';c.beginPath();c.moveTo(px,by-2);c.lineTo(px-8,by-14);c.lineTo(px+8,by-14);c.closePath();c.fill();c.fillRect(px-1.5,by,3,bhh);
+    if(done)return;
+    if(t>MAXT){hit(true);return;}
+    raf=requestAnimationFrame(frame);
+  }
+  function hit(timeout){
+    if(done)return;done=true;btn.disabled=true;
+    var d=Math.abs(pos-ctr),res=timeout?'miss':d<=half?'ok':d>half*2.5?'bad':'miss';
+    if(res==='ok'){me.pw=tg.pw+.5;R.passMsg='道中抜きで'+(me.place-1)+'番手に上がった。';}
+    else if(res==='bad'&&bh){me.pw=bh.pw-.5;R.passMsg='振り込んで1つ下がった。';}
+    else R.passMsg='差しは届かなかった。';
+    reorder();
+    cutin(res==='ok'?'道中抜き！':res==='bad'&&bh?'振り込み…':'届かず…',res==='ok'?'gold':'dim',function(){R.phase='run';render();});
+  }
+  btn.addEventListener('pointerdown',function(ev){ev.preventDefault();hit(false);});
+  btn.addEventListener('keydown',function(ev){if(ev.key===' '||ev.key==='Enter'){ev.preventDefault();hit(false);}});
+  raf=requestAnimationFrame(frame);
+}
+
+/* ---------- ピット離れ ---------- */
+function runPit(){
+  var ok=R.pit.ok;
+  function end(){cancelAnimationFrame(raf);if(R.phase!=='pitanim')return;R.phase='wait';
+    cutin(ok?'ピット離れ！':'出遅れ…',ok?'':'dim',function(){R.busy=false;R.phase='clock';render();});}
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){end();return;}
+  var cv=document.getElementById('pitcv'),W=Math.min(app.clientWidth-32,428),H=206,dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  var c=cv.getContext('2d');c.scale(dpr,dpr);
+  var COL=['#ffffff','#1a1a1a','#e0352b','#1f5fd1','#f5c518','#1c9a4b'],TX=['#111','#fff','#fff','#fff','#111','#fff'];
+  function lane(n){return 26+(n-1)*31;}
+  function sm(u){u=clamp(u,0,1);return u*u*(3-2*u);}
+  var t0=performance.now(),DUR=1900;
+  function frame(now){
+    var u=(now-t0)/DUR;
+    c.fillStyle='#bfe1e8';c.fillRect(0,0,W,H);
+    c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1;
+    for(var y=10;y<H;y+=14){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
+    c.fillStyle='#10212e';c.fillRect(0,0,34,H);
+    for(var n=1;n<=6;n++){c.fillStyle='#fff';c.font='900 12px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(n),17,lane(n));
+      c.fillStyle='#5b6b76';c.fillRect(34,lane(n)+14,14,3);}
+    R.boats.forEach(function(b){
+      var x=52+sm(Math.min(1,u))*(W-150),y=lane(b.no)+(lane(b.course)-lane(b.no))*sm((u-.4)/.45);
+      if(b.me)x+=(ok?1:-.7)*W*.2*sm(u*1.5);
+      c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=3;c.beginPath();c.moveTo(x-16,y);c.lineTo(Math.max(40,x-16-70*sm(u*2)),y);c.stroke();
+      c.fillStyle=COL[b.no-1];c.strokeStyle='#10212e';c.lineWidth=b.me?2.5:1.3;
+      c.beginPath();c.moveTo(x+19,y);c.lineTo(x+8,y-8);c.lineTo(x-15,y-8);c.lineTo(x-15,y+8);c.lineTo(x+8,y+8);c.closePath();c.fill();c.stroke();
+      c.fillStyle=TX[b.no-1];c.font='900 11px sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText(String(b.no),x-3,y+.5);
+      if(b.me){c.strokeStyle='#e0352b';c.lineWidth=2;c.beginPath();c.arc(x,y,20,0,7);c.stroke();}
+    });
+    if(u>1.25){end();return;}
+    raf=requestAnimationFrame(frame);
+  }
+  raf=requestAnimationFrame(frame);
+}
+
+/* ---------- レース映像 ---------- */
+function runRace(){
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){endRun();return;}
+  var cv=document.getElementById('course'),W=Math.min(app.clientWidth-32,428),H=Math.round(W*.6),dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
+  var c=cv.getContext('2d');c.scale(dpr,dpr);
+  var r=H*.2,lx=r+52,rx=W-r-52,cy=H/2,L=rx-lx,lap=2*L+2*Math.PI*r,total=lap*3,sx=lx+L/2;
+  var COL=['#ffffff','#1a1a1a','#e0352b','#1f5fd1','#f5c518','#1c9a4b'];
+  var mean=0;R.boats.forEach(function(b){mean+=b.pw;});mean/=6;
+  var bs=R.boats.map(function(b,i){return {b:b,T:(11.5-(b.pw-mean)*.05)*1000,A:total*rnd(.004,.013),k:ri(1,3),off:(b.course-1)*7,s:0,trail:[]};});
+  var maxT=0;bs.forEach(function(x){maxT=Math.max(maxT,x.T);});
+  function pos(d,o){
+    if(d<0)return [sx+d,cy+r+o];
+    d%=lap;
+    if(d<L/2)return [sx+d,cy+r+o]; d-=L/2;
+    if(d<Math.PI*r){var p=Math.PI/2-d/r;return [rx+(r+o)*Math.cos(p),cy+(r+o)*Math.sin(p)];} d-=Math.PI*r;
+    if(d<L)return [rx-d,cy-r-o]; d-=L;
+    if(d<Math.PI*r){var q=-Math.PI/2-d/r;return [lx+(r+o)*Math.cos(q),cy+(r+o)*Math.sin(q)];} d-=Math.PI*r;
+    return [lx+d,cy+r+o];
+  }
+  var t0=performance.now();
+  function frame(now){
+    var t=now-t0;
+    bs.forEach(function(x){var u=t/x.T;
+      x.s=u>=1?total+(t-x.T)*total/x.T*.5:total*u+x.A*Math.sin(Math.PI*x.k*u)-x.b.st*110*Math.max(0,1-t/1500);});
+    var rk=bs.slice().sort(function(a,b){return b.s-a.s;});
+    rk.forEach(function(x,i){var tg=(t<900?x.b.course-1:i)*7;x.off+=(tg-x.off)*.08;});
+    c.fillStyle='#bfe1e8';c.fillRect(0,0,W,H);
+    c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1;
+    for(var y=10;y<H;y+=14){c.beginPath();c.moveTo(0,y);c.lineTo(W,y);c.stroke();}
+    c.fillStyle='#e6f3f6';c.strokeStyle='#10212e';c.lineWidth=2;
+    c.beginPath();c.arc(rx,cy,r-12,-Math.PI/2,Math.PI/2);c.arc(lx,cy,r-12,Math.PI/2,Math.PI*1.5);c.closePath();c.fill();c.stroke();
+    c.setLineDash([5,4]);c.beginPath();c.moveTo(sx,cy+r-12);c.lineTo(sx,H);c.stroke();c.setLineDash([]);
+    [[rx,'1M'],[lx,'2M']].forEach(function(m){c.fillStyle='#e0352b';c.beginPath();c.arc(m[0],cy,5,0,7);c.fill();c.stroke();
+      c.fillStyle='#10212e';c.font='700 10px sans-serif';c.textAlign='center';c.fillText(m[1],m[0],cy-10);});
+    var lead=rk[0].s,lp=clamp(Math.floor(Math.max(0,lead)/lap)+1,1,3);
+    c.fillStyle='#10212e';c.font='900 13px sans-serif';c.textAlign='center';c.fillText(lead>=total?'ゴール':lp+'周目',(lx+rx)/2,cy+5);
+    bs.slice().sort(function(a,b){return a.s-b.s;}).forEach(function(x){
+      var p=pos(x.s,x.off),p2=pos(x.s+3,x.off),ang=Math.atan2(p2[1]-p[1],p2[0]-p[0]);
+      x.trail.push(p);if(x.trail.length>14)x.trail.shift();
+      c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=3;c.beginPath();
+      x.trail.forEach(function(q,i){if(i)c.lineTo(q[0],q[1]);else c.moveTo(q[0],q[1]);});c.stroke();
+      c.save();c.translate(p[0],p[1]);c.rotate(ang);
+      c.fillStyle=COL[x.b.no-1];c.strokeStyle='#10212e';c.lineWidth=x.b.me?2.5:1.2;
+      c.beginPath();c.moveTo(9,0);c.lineTo(2,-4.5);c.lineTo(-8,-4.5);c.lineTo(-8,4.5);c.lineTo(2,4.5);c.closePath();c.fill();c.stroke();
+      c.restore();
+      if(x.b.me){c.strokeStyle='#e0352b';c.lineWidth=2;c.beginPath();c.arc(p[0],p[1],13,0,7);c.stroke();}
+    });
+    if(t>maxT+700){endRun();return;}
+    raf=requestAnimationFrame(frame);
+  }
+  raf=requestAnimationFrame(frame);
+}
+function endRun(){
+  cancelAnimationFrame(raf);if(R.phase!=='run')return;
+  applyResult();R.phase='wait';
+  function go(){R.phase='result';render();}
+  if(R.boats[R.my-1].place===1)cutin(R.info.grade==='SG'?'SG制覇！':'優勝！','gold',go);else go();
+}
+
+/* ---------- 入力 ---------- */
+app.addEventListener('click',function(ev){
+  var el=ev.target.closest('[data-a]');if(!el)return;
+  var a=el.getAttribute('data-a'),k=el.getAttribute('data-k');
+  if(a==='start'){S={screen:'create',name:'',style:'in',mode:'quick',pers:'bold',gOffer:Math.random()<1/150};if(S.gOffer)S.pers='genius';render();if(S.gOffer)cutin('天才、現る！','gold');var n=document.getElementById('nm');if(n)n.focus();}
+  else if(a==='resume'){S=load(KEY);if(!S){render();return;}S.screen='main';render();}
+  else if(a==='style'){grab();S.style=k;render();}
+  else if(a==='mode'){grab();S.mode=k;render();}
+  else if(a==='pers'){grab();S.pers=k;render();}
+  else if(a==='go'){grab();newGame((S.name||'').trim().slice(0,6),S.style,S.mode,(S.rvName===undefined?'鳴海':S.rvName).trim().slice(0,6),S.pers);}
+  else if(a==='stc'){var s1=scene(S.turn);S.story.msg=s1.c[+k][1]()+bondFx(s1);log(s1.t+'：'+S.story.msg);render();}
+  else if(a==='stok'){var sc=scene(S.turn);if(!S.story.msg&&sc.fx)log(sc.t+'：'+sc.fx()+bondFx(sc));S.seen=S.turn;S.story=null;save();render();}
+  else if(a==='loadcode'){var ic=document.getElementById('incode'),d=dec(ic?ic.value:'');
+    if(d){S=d;titleMsg='';save();render();}else{titleMsg='コードが読み取れなかった。全部コピーできているか確かめてほしい。';render();}}
+  else if(a==='code'){codeOpen=true;render();var ce=document.getElementById('code');if(ce){ce.focus();ce.select();}}
+  else if(a==='codex'){codeOpen=false;render();}
+  else if(a==='copy'){var cc=document.getElementById('code');
+    function done(ok){el.textContent=ok?'コピーした':'長押しでコピーしてほしい';if(!ok&&cc){cc.focus();cc.select();}}
+    try{navigator.clipboard.writeText(cc.value).then(function(){done(true);},function(){done(false);});}catch(e){done(false);}}
+  else if(a==='train')train(k);
+  else if(a==='rest')rest();
+  else if(a==='ev'){S.event.msg=EVENTS[S.event.i].c[+k][1]();save();render();}
+  else if(a==='evok')nextTurn();
+  else if(a==='race')setupRace();
+  else if(a==='lot'){if(!R.lot)drawMotor();}
+  else if(a==='lotok'){R.phase='card';render();}
+  else if(a==='pit'){R.phase='clock';render();}
+  else if(a==='grab')grabCourse();
+  else if(a==='tac')resolve(R.tacs[+k]);
+  else if(a==='fres'){applyResult();R.phase='result';render();}
+  else if(a==='skip')endRun();
+  else if(a==='rnext'){R=null;nextTurn();}
+  else if(a==='again'){S=null;render();}
+});
+
+function boot(d){
+  if(d&&d.screen==='main'&&d.stats){S=d;}
+  render();
+}
+var hot=window.claude&&window.claude.hot;
+if(hot&&hot.snapshot)hot.snapshot(function(){return S&&S.screen==='main'?S:{};});
+if(hot&&hot.ready)hot.ready(boot);else boot((hot&&hot.data)||{});
+})();
+</script>
+</body>
+</html>
