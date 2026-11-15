@@ -68,6 +68,7 @@ input[type=text]{width:100%;padding:12px;font:inherit;font-size:17px;font-weight
 .next b{color:var(--accent)}
 .racer{padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
 .racer .nm{font-weight:900;font-size:18px;overflow-wrap:anywhere}
+td{overflow-wrap:anywhere}
 .hp{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;font-weight:700}
 .bar{height:10px;background:#dfe6e9;border-radius:2px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--water)}
@@ -365,7 +366,7 @@ function dec(c){try{
   var a=JSON.parse(decodeURIComponent(escape(atob(String(c).replace(/\s/g,'')))));
   if(!STYLES[a[1]]||!(a[2]>=1&&a[2]<=(a[16]==='deep'?48:32)))return null;
   function n(v,lo,hi){return clamp(Math.round(Number(v)||0),lo,hi);}
-  return {screen:'main',name:String(a[0]).slice(0,6)||'名無し',style:a[1],turn:n(a[2],1,48),mode:a[16]==='deep'?'deep':'quick',rvW:n(a[17],0,9),rvL:n(a[18],0,9),seen:n(a[19],0,48),story:null,rvName:String(a[20]||'').slice(0,6)||'鳴海',route:{m:'m',r:'r',f:'f'}[a[21]]||'',genius:!!a[24]||a[25]==='genius',pers:PERS[a[25]]?a[25]:'',cls:{B2:'B2',B1:'B1',A2:'A2',A1:'A1'}[a[22]]||'B2',per:(Array.isArray(a[23])?a[23]:[]).slice(0,6).map(function(v){return n(v,0,12);}),
+  return {screen:'main',name:(badName(a[0])?'':String(a[0]).slice(0,10))||'名無し',style:a[1],turn:n(a[2],1,48),mode:a[16]==='deep'?'deep':'quick',rvW:n(a[17],0,9),rvL:n(a[18],0,9),seen:n(a[19],0,48),story:null,rvName:(badName(a[20]||'')?'':String(a[20]||'').slice(0,10))||'鳴海',route:{m:'m',r:'r',f:'f'}[a[21]]||'',genius:!!a[24]||a[25]==='genius',pers:PERS[a[25]]?a[25]:'',cls:{B2:'B2',B1:'B1',A2:'A2',A1:'A1'}[a[22]]||'B2',per:(Array.isArray(a[23])?a[23]:[]).slice(0,6).map(function(v){return n(v,0,12);}),
     stats:{st:n(a[3],1,100),tn:n(a[4],1,100),mt:n(a[5],1,100),mn:n(a[6],1,100)},hp:n(a[7],0,100),mood:n(a[8],0,4),money:n(a[9],0,99999),
     pts:(Array.isArray(a[10])?a[10]:[]).slice(0,12).map(function(v){return n(v,0,12);}),wins:n(a[11],0,12),races:n(a[12],0,12),
     fRest:!!a[13],sgWin:!!a[14],restWhy:String(a[15]||''),log:['セーブコードから再開した。'],spot:pick(Object.keys(TRAIN)),event:null};
@@ -405,6 +406,10 @@ function cutin(main,kind,cb){
 }
 /* ---------- 進行 ---------- */
 function who(){return S.turn<=12?'教官':'師匠';}
+var NG=['しね','死ね','しんで','ころす','殺','かす','ごみ','あほ','阿呆','ばか','馬鹿','くそ','糞','くず','屑','ぼけ','まぬけ','間抜け','きもい','うざい','でぶ','ぶす','うんこ','うんち','ちんこ','ちんちん','まんこ','せっくす','えろ','きちがい','がいじ','fuck','shit','sex','bitch'];
+var NG_OK=['かすみ','かすが','かすや','しねま','ごみや','くずは','くずりゅう','とぼけ','かすてら','えろいか'];
+function norm(t){return String(t).normalize('NFKC').toLowerCase().replace(/[\u30a1-\u30f6]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-96);}).replace(/[\s\u3000_.\-・!！?？*＊]/g,'');}
+function badName(t){var n=norm(t);NG_OK.forEach(function(w){n=n.split(w).join('');});return NG.some(function(w){return n.indexOf(w)>=0;});}
 function rvn(){return esc((S&&S.rvName)||'鳴海');}
 function tx(t){return String(t).replace(/鳴海 迅|鳴海/g,rvn());}
 function grab(){var a=document.getElementById('nm'),b=document.getElementById('rv');if(a)S.name=a.value;if(b)S.rvName=b.value;}
@@ -591,7 +596,7 @@ function vTitle(){
 }
 function vCreate(){
   var h='<div class="top"><div class="when">選手登録</div></div>'+
-  '<div class="stack"><label class="f" for="nm">登録名（6文字まで）</label><input type="text" id="nm" maxlength="6" value="'+esc(S.name)+'" autocomplete="off"></div>'+
+  '<div class="stack"><label class="f" for="nm">登録名（10文字まで）</label><input type="text" id="nm" maxlength="10" value="'+esc(S.name)+'" autocomplete="off"></div>'+
   '<div class="stack"><span class="f" style="font-weight:900;font-size:13px">タイプ</span>';
   for(var k in STYLES)h+='<button class="card opt" data-a="style" data-k="'+k+'" aria-pressed="'+(S.style===k)+'"><span><b>'+STYLES[k].name+'</b><span class="sub">'+STYLES[k].desc+'</span></span></button>';
   h+='</div><div class="stack"><span style="font-weight:900;font-size:13px">性格</span>';
@@ -599,8 +604,8 @@ function vCreate(){
   h+='</div><div class="stack"><span style="font-weight:900;font-size:13px">モード</span>'+
   '<button class="card opt" data-a="mode" data-k="quick" aria-pressed="'+(S.mode!=='deep')+'"><span><b>あっさり</b><span class="sub">全32か月・レース7戦。育成とレースだけをテンポよく</span></span></button>'+
   '<button class="card opt" data-a="mode" data-k="deep" aria-pressed="'+(S.mode==='deep')+'"><span><b>じっくり</b><span class="sub">全48か月・レース11戦。ライバルと師匠の物語、絵つきのイベント</span></span></button>';
-  if(S.mode==='deep')h+='<label class="f" for="rv">ライバルの名前（6文字まで）</label><input type="text" id="rv" maxlength="6" value="'+esc(S.rvName===undefined?'鳴海':S.rvName)+'" autocomplete="off">';
-  return h+'</div><button class="btn red" data-a="go">入所する</button>';
+  if(S.mode==='deep')h+='<label class="f" for="rv">ライバルの名前（10文字まで）</label><input type="text" id="rv" maxlength="10" value="'+esc(S.rvName===undefined?'鳴海':S.rvName)+'" autocomplete="off">';
+  return h+'</div>'+(S.nameErr?'<p class="sub risk">'+S.nameErr+'</p>':'')+'<button class="btn red" data-a="go">入所する</button>';
 }
 function vScene(){
   var st=scene(S.turn),h='<div class="scene"><div class="top"><div><div class="sub">'+when(S.turn)+'</div><div class="when">'+tx(st.t)+'</div></div></div>'+art(st.pic,{season:season(S.turn)})+'<div class="tx">';
@@ -928,7 +933,9 @@ app.addEventListener('click',function(ev){
   else if(a==='style'){grab();S.style=k;render();}
   else if(a==='mode'){grab();S.mode=k;render();}
   else if(a==='pers'){grab();S.pers=k;render();}
-  else if(a==='go'){grab();newGame((S.name||'').trim().slice(0,6),S.style,S.mode,(S.rvName===undefined?'鳴海':S.rvName).trim().slice(0,6),S.pers);}
+  else if(a==='go'){grab();var n1=(S.name||'').trim().slice(0,10),n2=(S.rvName===undefined?'鳴海':S.rvName).trim().slice(0,10);
+    if(badName(n1)||badName(n2)){S.nameErr='その名前は使えない。人を傷つける言葉が入っていないか確かめてほしい。';render();return;}
+    newGame(n1,S.style,S.mode,n2,S.pers);}
   else if(a==='stc'){var s1=scene(S.turn);S.story.msg=s1.c[+k][1]()+bondFx(s1);log(s1.t+'：'+S.story.msg);render();}
   else if(a==='stok'){var sc=scene(S.turn);if(!S.story.msg&&sc.fx)log(sc.t+'：'+sc.fx()+bondFx(sc));S.seen=S.turn;S.story=null;save();render();}
   else if(a==='loadcode'){var ic=document.getElementById('incode'),d=dec(ic?ic.value:'');
