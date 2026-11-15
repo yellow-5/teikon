@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>艇道 レーサー育成</title>
+<title>艇魂 レーサー育成</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
@@ -580,7 +580,7 @@ function lanes(){var h='';for(var i=1;i<=6;i++)h+='<span class="c'+i+'">'+i+'</s
 function vTitle(){
   var sv=load(KEY),b=load(BEST);
   return '<div class="title">'+lanes()+
-  '<h1>艇道<small>艇王への道</small></h1>'+
+  '<h1>艇魂<small>ボートレーサー育成</small></h1>'+
   '<p>練習で能力を伸ばし、大時計に合わせてスタートを決め、1マークの勝負手を選ぶ。目指すは最高峰SGの優勝。短く遊ぶ「あっさり」と、物語と絵がつく「じっくり」を選べる。</p>'+
   '<div class="stack">'+(sv?'<button class="btn red" data-a="resume">つづきから（'+esc(when(sv.turn))+'）</button>':'')+
   '<button class="btn'+(sv?' ghost':' red')+'" data-a="start">はじめから</button></div>'+
