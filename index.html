@@ -69,6 +69,7 @@ input[type=text]{width:100%;padding:12px;font:inherit;font-size:17px;font-weight
 .racer{padding:10px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center}
 .racer .nm{font-weight:900;font-size:18px;overflow-wrap:anywhere}
 td{overflow-wrap:anywhere}
+.pbtn{font-weight:900;font-size:12.5px;border:2px solid var(--ink);border-radius:999px;padding:1px 9px;background:var(--b5)}
 .hp{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;font-weight:700}
 .bar{height:10px;background:#dfe6e9;border-radius:2px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--water)}
@@ -342,7 +343,7 @@ var EV_DEEP=[
 ];
 
 EV_PIC.forEach(function(k,i){EVENTS[i].pic=k;});EVENTS=EVENTS.concat(EV_DEEP);
-var S=null, R=null, raf=0, codeOpen=false, titleMsg='';
+var S=null, R=null, raf=0, codeOpen=false, persOpen=false, titleMsg='';
 var app=document.getElementById('app');
 
 function rnd(a,b){return a+Math.random()*(b-a);}
@@ -414,12 +415,14 @@ function rvn(){return esc((S&&S.rvName)||'鳴海');}
 function tx(t){return String(t).replace(/鳴海 迅|鳴海/g,rvn());}
 function grab(){var a=document.getElementById('nm'),b=document.getElementById('rv');if(a)S.name=a.value;if(b)S.rvName=b.value;}
 function checkStory(){if(S.mode==='deep'&&STORY[S.turn]&&(S.seen||0)<S.turn)S.story={msg:null};}
-function newGame(name,style,mode,rv,pers){
+function newGame(name,style,mode,rv){
+  var pers=Math.random()<1/150?'genius':pick(['bold','calm','hard','mood']);
   S={screen:'main',name:name||'名無し',style:style,turn:1,stats:{st:22,tn:22,mt:22,mn:22},hp:100,mood:2,money:0,
      pts:[],wins:0,races:0,log:['ボートレーサー養成所に入所した。1年後の修了記念を目指す。'],spot:pick(Object.keys(TRAIN)),
      fRest:false,event:null,sgWin:false,mode:mode==='deep'?'deep':'quick',rvW:0,rvL:0,seen:0,story:null,rvName:rv||'鳴海',cls:'B2',per:[],pers:PERS[pers]?pers:'calm',genius:pers==='genius'};
   var g=STYLES[style].g;for(var k in g)add(k,g[k]);
-  if(S.genius){STATS.forEach(function(x){add(x[0],15);});log('天才として入所した。初期能力+15、練習の伸びは2割増し。');}
+  if(S.genius){STATS.forEach(function(x){add(x[0],15);});log('性格は「天才」。初期能力+15、練習の伸びは2割増し。');}
+  else log('性格は「'+PERS[S.pers].name+'」。'+PERS[S.pers].desc+'。');
   checkStory();save();render();
   if(S.genius)cutin('天才！','gold');
 }
@@ -599,13 +602,11 @@ function vCreate(){
   '<div class="stack"><label class="f" for="nm">登録名（10文字まで）</label><input type="text" id="nm" maxlength="10" value="'+esc(S.name)+'" autocomplete="off"></div>'+
   '<div class="stack"><span class="f" style="font-weight:900;font-size:13px">タイプ</span>';
   for(var k in STYLES)h+='<button class="card opt" data-a="style" data-k="'+k+'" aria-pressed="'+(S.style===k)+'"><span><b>'+STYLES[k].name+'</b><span class="sub">'+STYLES[k].desc+'</span></span></button>';
-  h+='</div><div class="stack"><span style="font-weight:900;font-size:13px">性格</span>';
-  for(var q in PERS)if(q!=='genius'||S.gOffer)h+='<button class="card opt" data-a="pers" data-k="'+q+'" aria-pressed="'+(S.pers===q)+'"><span><b>'+PERS[q].name+'</b><span class="sub">'+PERS[q].desc+'</span></span></button>';
   h+='</div><div class="stack"><span style="font-weight:900;font-size:13px">モード</span>'+
   '<button class="card opt" data-a="mode" data-k="quick" aria-pressed="'+(S.mode!=='deep')+'"><span><b>あっさり</b><span class="sub">全32か月・レース7戦。育成とレースだけをテンポよく</span></span></button>'+
   '<button class="card opt" data-a="mode" data-k="deep" aria-pressed="'+(S.mode==='deep')+'"><span><b>じっくり</b><span class="sub">全48か月・レース11戦。ライバルと師匠の物語、絵つきのイベント</span></span></button>';
   if(S.mode==='deep')h+='<label class="f" for="rv">ライバルの名前（10文字まで）</label><input type="text" id="rv" maxlength="10" value="'+esc(S.rvName===undefined?'鳴海':S.rvName)+'" autocomplete="off">';
-  return h+'</div>'+(S.nameErr?'<p class="sub risk">'+S.nameErr+'</p>':'')+'<button class="btn red" data-a="go">入所する</button>';
+  return h+'</div>'+'<p class="sub">性格は入所したときに自動で決まる。育成画面で性格の名前を押すと、効果を確かめられる。</p>'+(S.nameErr?'<p class="sub risk">'+S.nameErr+'</p>':'')+'<button class="btn red" data-a="go">入所する</button>';
 }
 function vScene(){
   var st=scene(S.turn),h='<div class="scene"><div class="top"><div><div class="sub">'+when(S.turn)+'</div><div class="when">'+tx(st.t)+'</div></div></div>'+art(st.pic,{season:season(S.turn)})+'<div class="tx">';
@@ -620,7 +621,7 @@ function vMain(){
   var h='<div class="top"><div><div class="sub num">'+S.turn+' / '+last()+'か月</div><div class="when">'+when(S.turn)+'</div></div>'+
   '<div class="next">'+(isRace?'<b>今月レース</b>':'あと<b class="num">'+left+'</b>か月')+'<br>'+esc(nt===last()&&!isRace?'最終戦':nr.name)+'</div></div>';
   if(S.mode==='deep')h+=art('water',{season:season(S.turn),banner:true});
-  h+='<div class="card racer"><div class="nm">'+esc(S.name)+'　<span class="sub">'+STYLES[S.style].name+(PERS[S.pers]?'・'+PERS[S.pers].name:'')+'</span>'+'</div>'+
+  h+='<div class="card racer"><div class="nm">'+esc(S.name)+'　<span class="sub">'+STYLES[S.style].name+'</span>'+(PERS[S.pers]?'　<button class="pbtn" data-a="persinfo">性格：'+PERS[S.pers].name+' ›</button>':'')+'</div>'+
   '<div><span class="chip c'+(klass()==='A1'?3:klass()==='A2'?5:1)+'">'+klass()+'</span></div>'+
   '<div class="sub" style="font-weight:700;color:var(--ink)">調子 '+MOODS[S.mood]+'　賞金 <span class="num">'+S.money+'</span>万円'+(S.pts.length?'　勝率 <span class="num">'+avgPts().toFixed(2)+'</span>':'')+'</div><div></div>'+
   '<div class="hp"><span>体力</span><div class="bar'+(S.hp<50?' low':'')+'"><i style="width:'+S.hp+'%"></i></div><span class="num">'+S.hp+'</span></div></div>';
@@ -644,6 +645,11 @@ function vMain(){
   if(codeOpen){
     h+='<div class="ov"><div class="card" role="dialog" aria-label="セーブコード"><h2>セーブコード</h2><p class="sub">このコードを控えておけば、タイトル画面の「セーブコードで再開」からいつでも続きができる。</p>'+
     '<input type="text" id="code" readonly value="'+enc()+'" style="font-size:13px"><button class="btn" data-a="copy">コピーする</button><button class="btn ghost" data-a="codex">閉じる</button></div></div>';
+  }
+  if(persOpen&&PERS[S.pers]){
+    h+='<div class="ov"><div class="card" role="dialog" aria-label="性格"><p class="sub">'+esc(S.name)+' の性格</p><h2>'+PERS[S.pers].name+'</h2><p>'+PERS[S.pers].desc+'。</p><div class="rule"></div><p class="sub" style="font-weight:900">ほかの性格</p>';
+    for(var q in PERS)if(q!==S.pers)h+='<p class="sub"><b style="color:var(--ink)">'+PERS[q].name+'</b>　'+PERS[q].desc+'</p>';
+    h+='<p class="sub">性格は入所時に自動で決まり、途中では変わらない。</p><button class="btn ghost" data-a="persx">閉じる</button></div></div>';
   }
   if(S.event){
     var e=EVENTS[S.event.i];
@@ -928,20 +934,22 @@ function endRun(){
 app.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;
   var a=el.getAttribute('data-a'),k=el.getAttribute('data-k');
-  if(a==='start'){S={screen:'create',name:'',style:'in',mode:'quick',pers:'bold',gOffer:Math.random()<1/150};if(S.gOffer)S.pers='genius';render();if(S.gOffer)cutin('天才、現る！','gold');var n=document.getElementById('nm');if(n)n.focus();}
+  if(a==='start'){S={screen:'create',name:'',style:'in',mode:'quick'};render();var n=document.getElementById('nm');if(n)n.focus();}
   else if(a==='resume'){S=load(KEY);if(!S){render();return;}S.screen='main';render();}
   else if(a==='style'){grab();S.style=k;render();}
   else if(a==='mode'){grab();S.mode=k;render();}
   else if(a==='pers'){grab();S.pers=k;render();}
   else if(a==='go'){grab();var n1=(S.name||'').trim().slice(0,10),n2=(S.rvName===undefined?'鳴海':S.rvName).trim().slice(0,10);
     if(badName(n1)||badName(n2)){S.nameErr='その名前は使えない。人を傷つける言葉が入っていないか確かめてほしい。';render();return;}
-    newGame(n1,S.style,S.mode,n2,S.pers);}
+    newGame(n1,S.style,S.mode,n2);}
   else if(a==='stc'){var s1=scene(S.turn);S.story.msg=s1.c[+k][1]()+bondFx(s1);log(s1.t+'：'+S.story.msg);render();}
   else if(a==='stok'){var sc=scene(S.turn);if(!S.story.msg&&sc.fx)log(sc.t+'：'+sc.fx()+bondFx(sc));S.seen=S.turn;S.story=null;save();render();}
   else if(a==='loadcode'){var ic=document.getElementById('incode'),d=dec(ic?ic.value:'');
     if(d){S=d;titleMsg='';save();render();}else{titleMsg='コードが読み取れなかった。全部コピーできているか確かめてほしい。';render();}}
   else if(a==='code'){codeOpen=true;render();var ce=document.getElementById('code');if(ce){ce.focus();ce.select();}}
   else if(a==='codex'){codeOpen=false;render();}
+  else if(a==='persinfo'){persOpen=true;render();}
+  else if(a==='persx'){persOpen=false;render();}
   else if(a==='copy'){var cc=document.getElementById('code');
     function done(ok){el.textContent=ok?'コピーした':'長押しでコピーしてほしい';if(!ok&&cc){cc.focus();cc.select();}}
     try{navigator.clipboard.writeText(cc.value).then(function(){done(true);},function(){done(false);});}catch(e){done(false);}}
