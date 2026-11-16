@@ -94,7 +94,7 @@ td{overflow-wrap:anywhere}
 
 /* モーダル */
 .ov{position:fixed;inset:0;background:rgba(16,33,46,.55);display:flex;align-items:flex-end;justify-content:center;padding:16px;z-index:5}
-.ov .card{width:100%;max-width:428px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ov .card{width:100%;max-width:428px;padding:16px;display:flex;flex-direction:column;gap:12px;max-height:92vh;overflow-y:auto}
 .ov h2{font-size:21px}
 
 /* レース */
@@ -354,6 +354,21 @@ var EV_DEEP=[
 ];
 
 EV_PIC.forEach(function(k,i){EVENTS[i].pic=k;});EVENTS=EVENTS.concat(EV_DEEP);
+var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app',regMsg='';
+function regBody(){return JSON.stringify({name:S.name,st:S.stats.st,tn:S.stats.tn,mt:S.stats.mt,mn:S.stats.mn,at:Date.now()});}
+function regRacer(){
+  regMsg='登録中…';render();
+  function fail(){regMsg='登録できなかった。通信の状態を確かめてほしい。';render();}
+  function put(no){fetch(FB_URL+'/rooms/racer-'+no+'.json',{method:'PUT',body:regBody()}).then(function(r){if(!r.ok)throw 0;S.regNo=no;regMsg='登録した。';save();render();}).catch(fail);}
+  function fresh(n){var no=String(Math.floor(1000+Math.random()*9000));fetch(FB_URL+'/rooms/racer-'+no+'.json').then(function(r){return r.json();}).then(function(d){if(!d)put(no);else if(n<8)fresh(n+1);else fail();}).catch(fail);}
+  if(S.regNo)put(S.regNo);else fresh(0);
+}
+function regBlock(){
+  return '<div class="rule"></div><p style="font-weight:900">操作レースでこの選手を使う</p>'+
+  (S.regNo?'<p>登録番号 <b class="disp" style="font-size:28px;letter-spacing:.12em">'+S.regNo+'</b></p><p class="sub">操作レースの「登録番号」にこの4けたを入れると、この選手で走れる。育成が進んだら「更新」を押すと、同じ番号のまま今の能力になる。</p><a class="btn red" href="race.html?no='+S.regNo+'" style="text-decoration:none">この選手で操作レースへ</a><button class="btn ghost" data-a="reg">今の能力で登録を更新</button>'
+    :'<p class="sub">4けたの登録番号を発行する。長いセーブコードの代わりに、番号だけで選手を呼び出せる。</p><button class="btn" data-a="reg">登録番号を発行する</button>')+
+  (regMsg?'<p class="sub" style="font-weight:900;color:var(--ink)">'+regMsg+'</p>':'');
+}
 var S=null, R=null, raf=0, codeOpen=false, persOpen=false, titleMsg='';
 var app=document.getElementById('app');
 
@@ -747,7 +762,7 @@ function vMain(){
   h+='<div class="row2"><button class="btn ghost" data-a="help" style="padding:9px;font-size:13.5px">遊び方・用語</button><button class="btn ghost" data-a="code" style="padding:9px;font-size:13.5px">セーブコード</button></div>';
   if(codeOpen){
     h+='<div class="ov"><div class="card" role="dialog" aria-label="セーブコード"><h2>セーブコード</h2><p class="sub">このコードを控えておけば、タイトル画面の「セーブコードで再開」からいつでも続きができる。</p>'+
-    '<input type="text" id="code" readonly value="'+enc()+'" style="font-size:13px"><button class="btn" data-a="copy">コピーする</button><button class="btn ghost" data-a="codex">閉じる</button></div></div>';
+    '<input type="text" id="code" readonly value="'+enc()+'" style="font-size:13px"><button class="btn" data-a="copy">コピーする</button>'+regBlock()+'<button class="btn ghost" data-a="codex">閉じる</button></div></div>';
   }
   if(persOpen&&PERS[S.pers]){
     h+='<div class="ov"><div class="card" role="dialog" aria-label="性格"><p class="sub">'+esc(S.name)+' の性格</p><h2>'+PERS[S.pers].name+'</h2><p>'+PERS[S.pers].desc+'。</p><div class="rule"></div><p class="sub" style="font-weight:900">ほかの性格</p>';
@@ -836,6 +851,7 @@ function vEnd(){
   (deep?'<tr><td>'+tx('鳴海との対戦')+'</td><td class="r num">'+(S.rvW||0)+'勝 '+(S.rvL||0)+'敗</td></tr>':'')+'<tr><td>獲得賞金</td><td class="r num">'+S.money+'万円</td></tr>'+
   '<tr><td>総合点</td><td class="r num"><b>'+e.score+'点</b></td></tr></table></div>'+
   (RANK_URL?'<div class="card" style="padding:12px" class="stack"><p style="font-weight:900">ランキング</p>'+(e.rmsg?'<p style="font-weight:900;margin:4px 0">'+e.rmsg+'</p>':'<p class="sub" style="margin:4px 0 8px">この記録をみんなのランキングに公開できる。載るのは名前・称号・級別・総合点だけ。公開しなければ、どこにも送られない。</p>')+(e.sent?'<button class="btn ghost" data-a="rank">ランキングを見る</button>':e.sending?'':'<button class="btn" data-a="send">この記録を公開する</button>')+'</div>':'')+
+  '<div class="card stack" style="padding:12px">'+regBlock().replace('<div class="rule"></div>','')+'</div>'+
   '<button class="btn red" data-a="again">もう一度育てる</button></div>';
   return h;
 }
@@ -1051,7 +1067,7 @@ app.addEventListener('click',function(ev){
   else if(a==='loadcode'){var ic=document.getElementById('incode'),d=dec(ic?ic.value:'');
     if(d){S=d;titleMsg='';save();render();}else{titleMsg='コードが読み取れなかった。全部コピーできているか確かめてほしい。';render();}}
   else if(a==='code'){codeOpen=true;render();var ce=document.getElementById('code');if(ce){ce.focus();ce.select();}}
-  else if(a==='codex'){codeOpen=false;render();}
+  else if(a==='codex'){codeOpen=false;regMsg='';render();}
   else if(a==='rank')loadRank(S&&S.mode==='deep'?'deep':'quick');
   else if(a==='rmode')loadRank(k);
   else if(a==='rankx'){rank.open=false;render();}
@@ -1061,6 +1077,7 @@ app.addEventListener('click',function(ev){
   else if(a==='send')sendRank();
   else if(a==='persinfo'){persOpen=true;render();}
   else if(a==='persx'){persOpen=false;render();}
+  else if(a==='reg')regRacer();
   else if(a==='copy'){var cc=document.getElementById('code');
     function done(ok){el.textContent=ok?'コピーした':'長押しでコピーしてほしい';if(!ok&&cc){cc.focus();cc.select();}}
     try{navigator.clipboard.writeText(cc.value).then(function(){done(true);},function(){done(false);});}catch(e){done(false);}}
