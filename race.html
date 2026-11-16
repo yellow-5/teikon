@@ -223,7 +223,7 @@ function vTitle(){
   (NET.role==='host'&&!NET.busy?'<p>部屋番号 <b class="disp" style="font-size:30px;letter-spacing:.12em">'+NET.code+'</b></p>'+
      (NET.info?'<p style="font-weight:900">'+esc(NET.info.name)+' が入室した。'+(NET.auto?'まもなく自動で始まる。':'')+'</p><button class="btn red" data-a="netstart">'+(NET.auto?'今すぐ始める':'対戦を始める')+'</button>'
        :'<p class="sub">友達に招待リンクを送る。友達がリンクを開くと自動で部屋に入り、5秒後にレースが自動で始まる。番号を伝えて入力してもらってもよい。</p><button class="btn" data-a="netshare">招待リンクを送る</button>'+(NET.copied?'<p class="sub" style="font-weight:900;color:var(--ink)">'+NET.copied+'</p>':'')+'<p class="sub" style="-webkit-user-select:text;user-select:text;overflow-wrap:anywhere">'+inviteUrl()+'</p><p class="sub">送ったあとは、この画面に戻って待つ。画面を閉じると部屋も閉じる。</p>')+'<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を閉じる</button>'
-   :NET.role==='guest'&&NET.conn&&NET.conn.open?'<p style="font-weight:900">部屋 '+NET.code+' に入った。</p><p class="sub">まもなくレースが自動で始まる。この画面のまま待つ。</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を出る</button>'
+   :NET.role==='guest'&&netOpen()?'<p style="font-weight:900">部屋 '+NET.code+' に入った。</p><p class="sub">まもなくレースが自動で始まる。この画面のまま待つ。</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を出る</button>'
    :NET.busy?'<p class="sub">'+NET.msg+'</p>'
    :'<button class="btn" data-a="nethost">部屋を作る</button><label class="lbl" for="room">友達の部屋に入る</label><input type="text" id="room" inputmode="numeric" maxlength="4" placeholder="4けたの部屋番号" autocomplete="off"><button class="btn ghost" data-a="netjoin" style="padding:9px;font-size:14px">部屋に入る</button>')+
   (NET.msg&&!NET.busy?'<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>':'')+
@@ -466,6 +466,38 @@ function wheel(){
 }
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
 var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
+var FB_URL=''; /* 中継用データベースのURL。入っていれば、端末同士の直接接続の代わりにこちらを使う（VPNでも通る） */
+function netOpen(){return FB_URL?!!NET.linked:!!(NET.conn&&NET.conn.open);}
+function fbUrl(k){return FB_URL+'/rooms/'+NET.code+'/'+k+'.json';}
+function fbPut(k,o){return fetch(fbUrl(k),{method:'PUT',body:JSON.stringify(o)});}
+function fbMsg(key,d,initial){
+  if(!d||typeof d!=='object')return;
+  if(key==='hello'){if(!NET.linked){NET.linked=true;NET.busy=false;NET.msg='';nlog('相手とつながった');}netData({k:'hello',name:d.name,course:d.course});}
+  else if(key==='start'){if(initial||d.id===NET.startId){NET.startId=d.id;return;}NET.startId=d.id;d.k='start';netData(d);}
+  else if(key==='s'&&!initial){d.k='s';netData(d);}
+}
+function fbListen(side){
+  try{if(NET.es)NET.es.close();}catch(e){}
+  var first=true,es=new EventSource(FB_URL+'/rooms/'+NET.code+'/'+side+'.json');NET.es=es;
+  es.addEventListener('put',function(ev){var m;try{m=JSON.parse(ev.data);}catch(e){return;}if(!m)return;
+    if(m.path==='/'){var d=m.data;if(d&&typeof d==='object'){fbMsg('hello',d.hello,first);fbMsg('start',d.start,first);fbMsg('s',d.s,first);}first=false;return;}
+    var parts=m.path.split('/');if(parts.length===2)fbMsg(parts[1],m.data,false);});
+  es.onopen=function(){nlog('受信の準備ができた');};
+  es.onerror=function(){nlog('受信が途切れた（自動でつなぎ直す）');};
+}
+function fbHost(){
+  NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';NET.linked=false;NET.startId=0;NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();nlog('部屋を作る '+NET.code);
+  fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'PUT',body:JSON.stringify({meta:{at:Date.now()},h:{hello:{name:myName(),course:cfg.course,n:Date.now()}}})})
+  .then(function(r){if(!r.ok)throw new Error(r.status);nlog('部屋ができた');NET.busy=false;NET.msg='';fbListen('g');refreshTitle();})
+  .catch(function(e){nlog('部屋を作れなかった '+(e&&e.message||''));netClose('部屋を作れなかった。通信の状態を確かめてほしい。');});
+}
+function fbJoin(code){
+  NET.code=code;NET.role='guest';NET.linked=false;NET.startId=0;NET.busy=true;NET.msg='部屋に入っている…';refreshTitle();nlog('部屋を探す '+code);
+  fetch(FB_URL+'/rooms/'+code+'/meta.json').then(function(r){return r.json();}).then(function(m){
+    if(!m){netClose('その番号の部屋が見つからなかった。');return;}
+    nlog('部屋が見つかった');fbListen('h');return fbPut('g/hello',{name:myName(),course:cfg.course,n:Date.now()});
+  }).catch(function(e){nlog('入室に失敗 '+(e&&e.message||''));netClose('部屋に入れなかった。通信の状態を確かめてほしい。');});
+}
 var NLOG=[],NT0=Date.now();
 var ICE={config:{iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:stun.cloudflare.com:3478'},{urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
 function nlog(m){NLOG.push(((Date.now()-NT0)/1000).toFixed(1)+'秒 '+m);if(NLOG.length>14)NLOG.shift();var el=document.getElementById('nlog');if(el)el.textContent=NLOG.join('\n');}
@@ -478,7 +510,10 @@ function netLib(cb){
   sc.onload=function(){nlog('部品の読み込み 完了');cb();};sc.onerror=function(){nlog('部品の読み込み 失敗');NET.busy=false;NET.role=null;NET.msg='通信の部品を読み込めなかった。通信の状態を確かめてほしい。';refreshTitle();};document.head.appendChild(sc);
 }
 function refreshTitle(){if(!document.body.classList.contains('racing')&&document.getElementById('netbox'))show(vTitle());}
-function netClose(m){try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer)NET.peer.destroy();}catch(e){}
+function netClose(m){try{if(NET.es)NET.es.close();}catch(e){}NET.es=null;
+  if(FB_URL&&NET.role==='host'&&NET.code){try{fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'DELETE',keepalive:true}).catch(function(){});}catch(e){}}
+  NET.linked=false;NET.wr=false;
+  try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer)NET.peer.destroy();}catch(e){}
   clearTimeout(NET.auto);NET.auto=0;NET.copied='';NET.peer=null;NET.conn=null;NET.role=null;NET.info=null;NET.busy=false;NET.msg=m||'';if(G&&G.rp&&!G.over){G.rp.gone=true;say(G,'相手が切断');}refreshTitle();}
 function netWire(conn){
   NET.conn=conn;nlog('相手との接続を開始');
@@ -492,8 +527,15 @@ function netWire(conn){
   conn.on('error',function(e){nlog('接続エラー '+(e&&(e.type||e.message)||''));if(NET.conn===conn&&conn._wasOpen)netClose('通信でエラーが起きた。');});
   conn.on('open',function(){conn._wasOpen=true;});
 }
-function netSend(o){try{if(NET.conn&&NET.conn.open)NET.conn.send(o);}catch(e){}}
+function netSend(o){
+  if(FB_URL){if(!NET.role)return;var side=NET.role==='host'?'h':'g',k=o.k,b={};for(var x in o)if(x!=='k')b[x]=o[x];
+    if(k==='s'){if(NET.wr)return;NET.wr=true;var done=function(){NET.wr=false;};fbPut(side+'/s',b).then(done,done);}
+    else{if(k==='hello')b.n=Date.now();fbPut(side+'/'+k,b).catch(function(){});}
+    return;}
+  try{if(NET.conn&&NET.conn.open)NET.conn.send(o);}catch(e){}
+}
 function netHost(){
+  if(FB_URL){fbHost();return;}
   NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();
   netLib(function(){
     NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';
@@ -507,6 +549,7 @@ function netHost(){
 }
 function netJoin(code){
   code=String(code||'').replace(/\D/g,'');if(code.length!==4){NET.msg='部屋番号は4けたの数字。';refreshTitle();return;}
+  if(FB_URL){fbJoin(code);return;}
   NET.busy=true;NET.msg='部屋に入っている…';NET.code=code;refreshTitle();
   netLib(function(){
     NET.role='guest';
@@ -537,7 +580,7 @@ function netStart(){
   if(!gc||gc===hc){do{gc=Math.floor(rnd(1,7));}while(gc===hc);}
   cfg.free=false;audioInit();if(AU)AU.sec=99;
   start({my:hc,rpNo:gc});
-  netSend({k:'start',you:gc,host:hc,ai:G.ai.map(function(a){return {no:a.no,name:a.name,st:a.st};})});
+  netSend({k:'start',id:Date.now(),you:gc,host:hc,ai:G.ai.map(function(a){return {no:a.no,name:a.name,st:a.st};})});
 }
 function netData(d){
   if(!d||typeof d!=='object')return;
@@ -548,23 +591,25 @@ function netData(d){
   else if(d.k==='s'&&G&&G.rp&&!G.over){
     var r=G.rp,q=d.p;if(!Array.isArray(q))return;
     r.n={x:+q[0],y:+q[1],h:+q[2],v:+q[3],tot:+q[4],steer:+q[5],at:performance.now()};
-    if(q[6]!==null&&q[6]!==undefined&&r.st===null)r.st=+q[6];
-    if(q[7]!==null&&q[7]!==undefined&&r.fin===null)r.fin=+q[7];
+    if(q[6]!==null&&q[6]!==undefined&&+q[6]>-5&&r.st===null)r.st=+q[6];
+    if(q[7]!==null&&q[7]!==undefined&&+q[7]>-5&&r.fin===null)r.fin=+q[7];
     r.flying=!!q[8];
     if(NET.role==='guest'){
       if(typeof d.t==='number'&&Math.abs(G.t-(d.t+.05))>.12&&!G.finished)G.t=d.t+.05;
-      if(Array.isArray(d.a))d.a.forEach(function(x,i){var a=G.ai[i];if(!a||!Array.isArray(x))return;a.tot+=(+x[0]-a.tot)*.5;a.off=+x[1];a.v=+x[2];if(x[3]!==null&&x[3]!==undefined&&a.fin===null)a.fin=+x[3];});
+      if(Array.isArray(d.a))d.a.forEach(function(x,i){var a=G.ai[i];if(!a||!Array.isArray(x))return;a.tot+=(+x[0]-a.tot)*.5;a.off=+x[1];a.v=+x[2];if(x[3]!==null&&x[3]!==undefined&&+x[3]>-5&&a.fin===null)a.fin=+x[3];});
     }
   }
 }
 function netTick(now){
   if(!G||!G.rp)return;var r=G.rp,p=G.p;
+  if(r.n&&!r.gone&&now-r.n.at>7000){r.gone=true;say(G,'相手との通信が途切れた');}
+  if(r.n&&r.gone&&now-r.n.at<1000)r.gone=false;
   if(r.n&&!r.gone){var age=Math.min(.25,(now-r.n.at)/1000),tx=r.n.x+Math.cos(r.n.h)*r.n.v*age,ty=r.n.y+Math.sin(r.n.h)*r.n.v*age;
     r.x+=(tx-r.x)*.35;r.y+=(ty-r.y)*.35;var dh=r.n.h-r.h;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;r.h+=dh*.35;
     r.vF=r.n.v;r.tot=r.n.tot+r.n.v*age;r.steer=r.n.steer;r.trail.push([r.x,r.y,r.h]);if(r.trail.length>22)r.trail.shift();}
-  if(now-NET.last>50){NET.last=now;
-    var m={k:'s',p:[Math.round(p.x*10)/10,Math.round(p.y*10)/10,Math.round(p.h*1000)/1000,Math.round(p.vF),Math.round(p.tot*10)/10,Math.round((p.steer||0)*100)/100,G.stTime,G.finTime,G.flying?1:0]};
-    if(NET.role==='host'){m.t=Math.round(G.t*1000)/1000;m.a=G.ai.map(function(a){return [Math.round(a.tot*10)/10,Math.round(a.off*10)/10,Math.round(a.v),a.fin];});}
+  if(now-NET.last>(FB_URL?80:50)){NET.last=now;
+    var m={k:'s',p:[Math.round(p.x*10)/10,Math.round(p.y*10)/10,Math.round(p.h*1000)/1000,Math.round(p.vF),Math.round(p.tot*10)/10,Math.round((p.steer||0)*100)/100,G.stTime===null?-9:Math.round(G.stTime*1000)/1000,G.finTime===null?-9:Math.round(G.finTime*1000)/1000,G.flying?1:0]};
+    if(NET.role==='host'){m.t=Math.round(G.t*1000)/1000;m.a=G.ai.map(function(a){return [Math.round(a.tot*10)/10,Math.round(a.off*10)/10,Math.round(a.v),a.fin===null?-9:Math.round(a.fin*1000)/1000];});}
     netSend(m);}
 }
 function panel(x,y,w,h){cx.fillStyle='rgba(16,33,46,.84)';cx.fillRect(x,y,w,h);}
@@ -674,10 +719,10 @@ window.addEventListener('resize',function(){if(document.body.classList.contains(
 app.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;var a=el.getAttribute('data-a'),k=el.getAttribute('data-k'),ce=document.getElementById('code');
   if(ce)cfg.code=ce.value;
-  if(a==='pre'){cfg.pre=k;cfg.stats=null;cfg.codeMsg='';show(vTitle());if(NET.conn&&NET.conn.open)netSend({k:'hello',name:myName(),course:cfg.course});}
+  if(a==='pre'){cfg.pre=k;cfg.stats=null;cfg.codeMsg='';show(vTitle());if(netOpen())netSend({k:'hello',name:myName(),course:cfg.course});}
   else if(a==='lv'){cfg.lv=k;show(vTitle());}
   else if(a==='view'){cfg.view=k;show(vTitle());}
-  else if(a==='course'){cfg.course=+k;show(vTitle());if(NET.conn&&NET.conn.open)netSend({k:'hello',name:myName(),course:cfg.course});}
+  else if(a==='course'){cfg.course=+k;show(vTitle());if(netOpen())netSend({k:'hello',name:myName(),course:cfg.course});}
   else if(a==='tilt'){cfg.tilt=+k;show(vTitle());}
   else if(a==='free'){cfg.free=true;audioInit();if(AU)AU.sec=0;start();}
   else if(a==='nethost'){audioInit();netHost();}
