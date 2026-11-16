@@ -467,6 +467,7 @@ function wheel(){
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
 var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
 var NLOG=[],NT0=Date.now();
+var ICE={config:{iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:stun.cloudflare.com:3478'},{urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
 function nlog(m){NLOG.push(((Date.now()-NT0)/1000).toFixed(1)+'秒 '+m);if(NLOG.length>14)NLOG.shift();var el=document.getElementById('nlog');if(el)el.textContent=NLOG.join('\n');}
 function inviteUrl(){return location.origin+location.pathname+'?room='+NET.code;}
 function myName(){return cfg.stats?cfg.stats.name:PRE[cfg.pre].name;}
@@ -482,6 +483,7 @@ function netClose(m){try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer
 function netWire(conn){
   NET.conn=conn;nlog('相手との接続を開始');
   var watch=function(){try{var pc=conn.peerConnection;if(pc&&!pc._tk){pc._tk=1;nlog('経路の状態 '+pc.iceConnectionState);pc.addEventListener('iceconnectionstatechange',function(){nlog('経路の状態 '+pc.iceConnectionState);});
+    pc.addEventListener('icecandidate',function(ev){if(ev.candidate&&ev.candidate.type){pc._ty=pc._ty||{};if(!pc._ty[ev.candidate.type]){pc._ty[ev.candidate.type]=1;nlog('経路の候補 '+ev.candidate.type);}}});
     pc.addEventListener('icecandidateerror',function(ev){if(!pc._ce){pc._ce=1;nlog('経路の候補でエラー '+(ev.errorCode||''));}});}}catch(e){}};
   watch();setTimeout(watch,400);setTimeout(watch,1500);
   conn.on('open',function(){nlog('相手とつながった');NET.busy=false;NET.msg='';netSend({k:'hello',name:myName(),course:cfg.course});refreshTitle();});
@@ -495,7 +497,7 @@ function netHost(){
   NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();
   netLib(function(){
     NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';
-    try{NET.peer=new Peer('teikon-race-'+NET.code);}catch(e){netClose('部屋を作れなかった。');return;}
+    try{NET.peer=new Peer('teikon-race-'+NET.code,ICE);}catch(e){netClose('部屋を作れなかった。');return;}
     NET.peer.on('open',function(id){nlog('中継サーバーに接続 '+id);NET.busy=false;NET.msg='';refreshTitle();});
     NET.peer.on('disconnected',function(){nlog('中継サーバーから切断');var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
     NET.peer.on('connection',function(c){nlog('相手から接続の申し込み');if(NET.conn&&NET.conn.open){try{c.close();}catch(e){}return;}netWire(c);});
@@ -508,7 +510,7 @@ function netJoin(code){
   NET.busy=true;NET.msg='部屋に入っている…';NET.code=code;refreshTitle();
   netLib(function(){
     NET.role='guest';
-    try{NET.peer=new Peer();}catch(e){netClose('接続できなかった。');return;}
+    try{NET.peer=new Peer(undefined,ICE);}catch(e){netClose('接続できなかった。');return;}
     NET.tries=0;
     function attempt(){
       if(NET.role!=='guest'||!NET.peer||(NET.conn&&NET.conn.open))return;
@@ -517,13 +519,13 @@ function netJoin(code){
       try{netWire(NET.peer.connect('teikon-race-'+code,{reliable:true,serialization:'json'}));}catch(e){}
       setTimeout(function(){
         if(NET.role!=='guest'||(NET.conn&&NET.conn.open))return;
-        if(NET.tries<8)attempt();else netClose('部屋に入れなかった。番号が合っているか、相手が部屋の画面を開いたままか確かめてほしい。2人ともスマホの回線だとつながりにくいので、どちらかをWi-Fiにすると入れることがある。');
-      },6000);
+        if(NET.tries<3)attempt();else netClose('部屋に入れなかった。番号が合っているか、相手が部屋の画面を開いたままか確かめてほしい。2人ともスマホの回線だとつながりにくいので、どちらかをWi-Fiにすると入れることがある。VPNを使っている場合は、切ると入れることがある。');
+      },20000);
     }
     NET.peer.on('open',function(id){nlog('中継サーバーに接続 '+id);attempt();});
     NET.peer.on('disconnected',function(){nlog('中継サーバーから切断');var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
     NET.peer.on('error',function(e){var t=e&&e.type;nlog('エラー '+t);if(NET.conn&&NET.conn.open)return;
-      if(t==='peer-unavailable'){if(NET.tries>=8)netClose('その番号の部屋が見つからなかった。相手が部屋の画面を開いたままか確かめてほしい。');return;}
+      if(t==='peer-unavailable'){if(NET.tries>=3)netClose('その番号の部屋が見つからなかった。相手が部屋の画面を開いたままか確かめてほしい。');return;}
       if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error')return;
       netClose('接続できなかった。時間をおいて試してほしい。');});
   });
