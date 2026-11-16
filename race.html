@@ -197,9 +197,39 @@ function decode(code){try{var a=JSON.parse(decodeURIComponent(escape(atob(String
   var v=[a[3],a[4],a[5],a[6]].map(function(n){return clamp(Math.round(Number(n)||0),1,100);});
   if(!a[0]||v.some(function(n){return !n;}))return null;return {name:String(a[0]).slice(0,10),st:v[0],tn:v[1],mt:v[2],mn:v[3]};}catch(e){return null;}}
 function curStats(){if(cfg.stats)return cfg.stats;var v=PRE[cfg.pre].v;return {st:v,tn:v,mt:v,mn:v};}
+function helloMsg(){return {k:'hello',name:myName(),course:cfg.course,ready:NET.ready?1:0};}
+function netBox(){
+  var h='<div class="card stack" id="netbox" style="padding:12px"><span class="lbl">友達とリアルタイム対戦（2人）</span>';
+  if(NET.busy)h+='<p class="sub">'+NET.msg+'</p>';
+  else if(NET.role&&netOpen()&&NET.info){
+    var same=cfg.course&&NET.info.course===cfg.course;
+    h+='<p style="font-weight:900">部屋 '+NET.code+'　'+esc(NET.info.name)+' と接続中</p>'+
+    '<div class="card" style="padding:2px 8px"><table><tr><th></th><th>コース</th><th>準備</th></tr>'+
+    '<tr class="me"><td>自分</td><td>'+(cfg.course||'おまかせ')+'</td><td>'+(NET.ready?'OK':'選択中')+'</td></tr>'+
+    '<tr><td>'+esc(NET.info.name)+'</td><td>'+(NET.info.course||'おまかせ')+'</td><td>'+(NET.info.ready?'OK':'選択中')+'</td></tr></table></div>'+
+    (same?'<p class="sub" style="font-weight:900;color:var(--accent)">相手と同じコースを選んでいる。このままだと、部屋に入った人が別のコースになる。</p>':'')+
+    (NET.auto?'<p style="font-weight:900">2人とも準備OK。まもなく始まる。</p>'
+      :'<p class="sub">下で選手・コース・チルト・視点を選んでから「準備OK」を押す。2人とも準備OKになると、レースが自動で始まる。</p>')+
+    '<button class="btn '+(NET.ready?'ghost':'red')+'" data-a="netready">'+(NET.ready?'準備を取り消す':'準備OK')+'</button>'+
+    '<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">'+(NET.role==='host'?'部屋を閉じる':'部屋を出る')+'</button>';
+  }else if(NET.role==='host'){
+    h+='<p>部屋番号 <b class="disp" style="font-size:30px;letter-spacing:.12em">'+NET.code+'</b></p>'+
+    '<p class="sub">友達に招待リンクを送る。友達がリンクを開くと自動で部屋に入る。番号を伝えて入力してもらってもよい。</p><button class="btn" data-a="netshare">招待リンクを送る</button>'+
+    (NET.copied?'<p class="sub" style="font-weight:900;color:var(--ink)">'+NET.copied+'</p>':'')+
+    '<p class="sub" style="-webkit-user-select:text;user-select:text;overflow-wrap:anywhere">'+inviteUrl()+'</p>'+
+    '<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を閉じる</button>';
+  }else if(NET.role==='guest'){
+    h+='<p class="sub">部屋 '+NET.code+' に入っている…</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">やめる</button>';
+  }else{
+    h+='<button class="btn" data-a="nethost">部屋を作る</button><label class="lbl" for="room">友達の部屋に入る</label><input type="text" id="room" inputmode="numeric" maxlength="4" placeholder="4けたの部屋番号" autocomplete="off"><button class="btn ghost" data-a="netjoin" style="padding:9px;font-size:14px">部屋に入る</button>';
+  }
+  if(NET.msg&&!NET.busy)h+='<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>';
+  if(NLOG.length&&!(NET.role&&netOpen()))h+='<p class="sub" style="font-weight:900;color:var(--ink)">通信の記録（うまくいかないときは、この部分の写真を送ってほしい）</p><pre id="nlog" class="sub" style="white-space:pre-wrap;font-family:inherit;line-height:1.45">'+esc(NLOG.join('\n'))+'</pre>';
+  return h+'<p class="sub">2人が同じレースを同時に走る。残りの4艇はコンピューター。相手の強さは部屋を作った人の設定が使われる。</p></div>';
+}
 function vTitle(){
   var s=curStats(),h='<h1>艇魂<small>操作レース 試作版</small></h1>'+
-  '<p>選手の目線で艇に乗り、自分でハンドルとレバーを操作して3周走る。相手は5艇。<b>レース画面は横向きで表示される。スマホは横に持って遊ぶ。</b></p>'+
+  '<p>選手の目線で艇に乗り、自分でハンドルとレバーを操作して3周走る。相手は5艇。<b>レース画面は横向きで表示される。スマホは横に持って遊ぶ。</b></p>'+(NET.role?netBox():'')+
   '<div class="stack"><span class="lbl">選手</span><div class="opts">';
   for(var k in PRE)h+='<button class="card opt" data-a="pre" data-k="'+k+'" aria-pressed="'+(!cfg.stats&&cfg.pre===k)+'">'+PRE[k].name+'<span>全能力 '+PRE[k].v+'</span></button>';
   h+='</div><label class="lbl" for="code">育てた選手で走る（セーブコード）</label><input type="text" id="code" placeholder="本編のセーブコードを貼り付け" value="'+esc(cfg.code)+'" autocomplete="off">'+
@@ -218,17 +248,9 @@ function vTitle(){
   '<button class="card opt" data-a="view" data-k="fp" aria-pressed="'+(cfg.view==='fp')+'">選手の目線<span>艇に乗った視点</span></button>'+
   '<button class="card opt" data-a="view" data-k="back" aria-pressed="'+(cfg.view==='back')+'">後ろから<span>艇全体が見える</span></button>'+
   '<button class="card opt" data-a="view" data-k="high" aria-pressed="'+(cfg.view==='high')+'">上空から<span>周りが見渡せる</span></button></div><p class="sub">レース中も左上の「視点」で切り替えられる。</p></div>'+
-  '<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>'+
-  '<div class="card stack" id="netbox" style="padding:12px"><span class="lbl">友達とリアルタイム対戦（2人）</span>'+
-  (NET.role==='host'&&!NET.busy?'<p>部屋番号 <b class="disp" style="font-size:30px;letter-spacing:.12em">'+NET.code+'</b></p>'+
-     (NET.info?'<p style="font-weight:900">'+esc(NET.info.name)+' が入室した。'+(NET.auto?'まもなく自動で始まる。':'')+'</p><button class="btn red" data-a="netstart">'+(NET.auto?'今すぐ始める':'対戦を始める')+'</button>'
-       :'<p class="sub">友達に招待リンクを送る。友達がリンクを開くと自動で部屋に入り、5秒後にレースが自動で始まる。番号を伝えて入力してもらってもよい。</p><button class="btn" data-a="netshare">招待リンクを送る</button>'+(NET.copied?'<p class="sub" style="font-weight:900;color:var(--ink)">'+NET.copied+'</p>':'')+'<p class="sub" style="-webkit-user-select:text;user-select:text;overflow-wrap:anywhere">'+inviteUrl()+'</p><p class="sub">送ったあとは、この画面に戻って待つ。画面を閉じると部屋も閉じる。</p>')+'<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を閉じる</button>'
-   :NET.role==='guest'&&netOpen()?'<p style="font-weight:900">部屋 '+NET.code+' に入った。</p><p class="sub">まもなくレースが自動で始まる。この画面のまま待つ。</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を出る</button>'
-   :NET.busy?'<p class="sub">'+NET.msg+'</p>'
-   :'<button class="btn" data-a="nethost">部屋を作る</button><label class="lbl" for="room">友達の部屋に入る</label><input type="text" id="room" inputmode="numeric" maxlength="4" placeholder="4けたの部屋番号" autocomplete="off"><button class="btn ghost" data-a="netjoin" style="padding:9px;font-size:14px">部屋に入る</button>')+
-  (NET.msg&&!NET.busy?'<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>':'')+
-  (NLOG.length?'<p class="sub" style="font-weight:900;color:var(--ink)">通信の記録（うまくいかないときは、この部分の写真を送ってほしい）</p><pre id="nlog" class="sub" style="white-space:pre-wrap;font-family:inherit;line-height:1.45">'+esc(NLOG.join('\n'))+'</pre>':'')+
-  '<p class="sub">2人が同じレースを同時に走る。残りの4艇はコンピューター。相手の強さは部屋を作った人の設定が使われる。コースが重なったら、入った人が別のコースになる。</p></div>'+
+  (NET.role&&netOpen()?'':'<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>')+
+  (NET.role?'':netBox())+
+
   '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、下げると減速して小さく回れる。指を離すと自動で下がる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
   '<p class="sub">能力の効き方：スタート＝加速、ターン＝旋回の鋭さと滑りにくさ、整備＝最高速、メンタル＝引き波と接触への強さ。Macでは ← → キーでハンドル、スペースキーを押している間レバー全開。</p>'+
   '<p class="sub"><a href="./">本編（育成）にもどる</a></p>';
@@ -247,6 +269,7 @@ function vResult(){
     h+='<div class="card" style="padding:2px 8px"><table><tr><th>着</th><th>枠</th><th>選手</th><th class="r">ST</th></tr>';
     rows.forEach(function(r,i){h+='<tr'+(r.me?' class="me"':'')+'><td class="num">'+(i+1)+'</td><td><span class="chip" style="background:'+COL[r.no-1]+';color:'+TXC[r.no-1]+'">'+r.no+'</span></td><td>'+esc(r.name)+'</td><td class="r num">'+(r.st===null?'-':'.'+String(Math.min(99,Math.round(r.st*100))).padStart(2,'0'))+'</td></tr>';});
     h+='</table></div>';}
+  if(NET.role&&netOpen())return h+'<button class="btn red" data-a="title">部屋にもどる（もう一度対戦）</button>';
   return h+'<button class="btn red" data-a="go">もう一度走る</button><button class="btn ghost" data-a="title">選手・強さを変える</button>';
 }
 function show(html){cancelAnimationFrame(raf);document.body.classList.remove('racing');app.innerHTML=html;}
@@ -475,19 +498,20 @@ function fbMsg(key,d,initial){
   if(key==='hello'){if(!NET.linked){NET.linked=true;NET.busy=false;NET.msg='';nlog('相手とつながった');}netData({k:'hello',name:d.name,course:d.course});}
   else if(key==='start'){if(initial||d.id===NET.startId){NET.startId=d.id;return;}NET.startId=d.id;d.k='start';netData(d);}
   else if(key==='s'&&!initial){d.k='s';netData(d);}
+  else if(key==='soon'&&!initial){d.k='soon';netData(d);}
 }
 function fbListen(side){
   try{if(NET.es)NET.es.close();}catch(e){}
   var first=true,es=new EventSource(FB_URL+'/rooms/'+NET.code+'/'+side+'.json');NET.es=es;
   es.addEventListener('put',function(ev){var m;try{m=JSON.parse(ev.data);}catch(e){return;}if(!m)return;
-    if(m.path==='/'){var d=m.data;if(d&&typeof d==='object'){fbMsg('hello',d.hello,first);fbMsg('start',d.start,first);fbMsg('s',d.s,first);}first=false;return;}
+    if(m.path==='/'){var d=m.data;if(d&&typeof d==='object'){if(!first)fbMsg('soon',d.soon,false);fbMsg('hello',d.hello,first);fbMsg('start',d.start,first);fbMsg('s',d.s,first);}first=false;return;}
     var parts=m.path.split('/');if(parts.length===2)fbMsg(parts[1],m.data,false);});
   es.onopen=function(){nlog('受信の準備ができた');};
   es.onerror=function(){nlog('受信が途切れた（自動でつなぎ直す）');};
 }
 function fbHost(){
   NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';NET.linked=false;NET.startId=0;NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();nlog('部屋を作る '+NET.code);
-  fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'PUT',body:JSON.stringify({meta:{at:Date.now()},h:{hello:{name:myName(),course:cfg.course,n:Date.now()}}})})
+  fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'PUT',body:JSON.stringify({meta:{at:Date.now()},h:{hello:{name:myName(),course:cfg.course,ready:0,n:Date.now()}}})})
   .then(function(r){if(!r.ok)throw new Error(r.status);nlog('部屋ができた');NET.busy=false;NET.msg='';fbListen('g');refreshTitle();})
   .catch(function(e){nlog('部屋を作れなかった '+(e&&e.message||''));netClose('部屋を作れなかった。通信の状態を確かめてほしい。');});
 }
@@ -495,7 +519,7 @@ function fbJoin(code){
   NET.code=code;NET.role='guest';NET.linked=false;NET.startId=0;NET.busy=true;NET.msg='部屋に入っている…';refreshTitle();nlog('部屋を探す '+code);
   fetch(FB_URL+'/rooms/'+code+'/meta.json').then(function(r){return r.json();}).then(function(m){
     if(!m){netClose('その番号の部屋が見つからなかった。');return;}
-    nlog('部屋が見つかった');fbListen('h');return fbPut('g/hello',{name:myName(),course:cfg.course,n:Date.now()});
+    nlog('部屋が見つかった');fbListen('h');return fbPut('g/hello',{name:myName(),course:cfg.course,ready:0,n:Date.now()});
   }).catch(function(e){nlog('入室に失敗 '+(e&&e.message||''));netClose('部屋に入れなかった。通信の状態を確かめてほしい。');});
 }
 var NLOG=[],NT0=Date.now();
@@ -512,7 +536,7 @@ function netLib(cb){
 function refreshTitle(){if(!document.body.classList.contains('racing')&&document.getElementById('netbox'))show(vTitle());}
 function netClose(m){try{if(NET.es)NET.es.close();}catch(e){}NET.es=null;
   if(FB_URL&&NET.role==='host'&&NET.code){try{fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'DELETE',keepalive:true}).catch(function(){});}catch(e){}}
-  NET.linked=false;NET.wr=false;
+  NET.linked=false;NET.wr=false;NET.ready=false;
   try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer)NET.peer.destroy();}catch(e){}
   clearTimeout(NET.auto);NET.auto=0;NET.copied='';NET.peer=null;NET.conn=null;NET.role=null;NET.info=null;NET.busy=false;NET.msg=m||'';if(G&&G.rp&&!G.over){G.rp.gone=true;say(G,'相手が切断');}refreshTitle();}
 function netWire(conn){
@@ -521,7 +545,7 @@ function netWire(conn){
     pc.addEventListener('icecandidate',function(ev){if(ev.candidate&&ev.candidate.type){pc._ty=pc._ty||{};if(!pc._ty[ev.candidate.type]){pc._ty[ev.candidate.type]=1;nlog('経路の候補 '+ev.candidate.type);}}});
     pc.addEventListener('icecandidateerror',function(ev){if(!pc._ce){pc._ce=1;nlog('経路の候補でエラー '+(ev.errorCode||''));}});}}catch(e){}};
   watch();setTimeout(watch,400);setTimeout(watch,1500);
-  conn.on('open',function(){nlog('相手とつながった');NET.busy=false;NET.msg='';netSend({k:'hello',name:myName(),course:cfg.course});refreshTitle();});
+  conn.on('open',function(){nlog('相手とつながった');NET.busy=false;NET.msg='';netSend(helloMsg());refreshTitle();});
   conn.on('data',netData);
   conn.on('close',function(){nlog('接続が閉じた');if(NET.conn===conn&&conn._wasOpen)netClose('相手との接続が切れた。');});
   conn.on('error',function(e){nlog('接続エラー '+(e&&(e.type||e.message)||''));if(NET.conn===conn&&conn._wasOpen)netClose('通信でエラーが起きた。');});
@@ -573,6 +597,12 @@ function netJoin(code){
       netClose('接続できなかった。時間をおいて試してほしい。');});
   });
 }
+function netReadyCheck(){
+  var racing=document.body.classList.contains('racing'),both=NET.ready&&NET.info&&NET.info.ready&&netOpen();
+  if(NET.role!=='host'){if(!both)NET.auto=0;return;}
+  if(both&&!racing&&!NET.auto){netSend({k:'soon',id:Date.now()});NET.auto=setTimeout(function(){NET.auto=0;if(NET.ready&&NET.info&&NET.info.ready&&!document.body.classList.contains('racing'))netStart();else refreshTitle();},2500);}
+  else if(!both&&NET.auto){clearTimeout(NET.auto);NET.auto=0;}
+}
 function netStart(){
   if(NET.role!=='host'||!NET.info)return;
   clearTimeout(NET.auto);NET.auto=0;
@@ -584,9 +614,10 @@ function netStart(){
 }
 function netData(d){
   if(!d||typeof d!=='object')return;
-  if(d.k==='hello'){var first=!NET.info;NET.info={name:String(d.name||'友達').slice(0,10),course:Number(d.course)||0};
-    if(first&&NET.role==='host'&&!document.body.classList.contains('racing')){clearTimeout(NET.auto);NET.autoAt=Date.now()+5000;NET.auto=setTimeout(function(){NET.auto=0;if(!document.body.classList.contains('racing'))netStart();},5000);}
-    refreshTitle();}
+  if(d.k==='hello'){var first=!NET.info;NET.info={name:String(d.name||'友達').slice(0,10),course:Number(d.course)||0,ready:!!d.ready};
+    if(first)netSend(helloMsg());
+    netReadyCheck();refreshTitle();}
+  else if(d.k==='soon'&&NET.role==='guest'){NET.auto=1;refreshTitle();}
   else if(d.k==='start'&&NET.role==='guest'){cfg.free=false;if(AU)AU.sec=99;start({my:Number(d.you)||1,rpNo:Number(d.host)||2,aiDefs:Array.isArray(d.ai)?d.ai:[]});}
   else if(d.k==='s'&&G&&G.rp&&!G.over){
     var r=G.rp,q=d.p;if(!Array.isArray(q))return;
@@ -676,7 +707,8 @@ function size(){
 }
 function pt(e){return rot?[e.clientY,PW-e.clientX]:[e.clientX,e.clientY];}
 function start(o){
-  o=o||{};var cs=curStats(),avg=(cs.st+cs.tn+cs.mt+cs.mn)/4;
+  o=o||{};if(o.rpNo){NET.ready=false;NET.auto=0;if(NET.info)NET.info.ready=false;}
+  var cs=curStats(),avg=(cs.st+cs.tn+cs.mt+cs.mn)/4;
   G=newRace({stats:cs,aiSpeed:162+(avg-45)*.48+LV[cfg.lv].v,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rpNo:o.rpNo,rpName:NET.info?NET.info.name:'友達',aiDefs:o.aiDefs});inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
   show(vRace());document.body.classList.add('racing');cv=document.getElementById('cv');size();C.h=G.p.h;
   cv.addEventListener('pointerdown',pd);cv.addEventListener('pointermove',pm);cv.addEventListener('pointerup',pu);cv.addEventListener('pointercancel',pu);
@@ -684,7 +716,7 @@ function start(o){
   try{var de=document.documentElement;if(de.requestFullscreen)de.requestFullscreen().then(function(){try{screen.orientation.lock('landscape').catch(function(){});}catch(e){}}).catch(function(){});}catch(e){}
   last=performance.now();raf=requestAnimationFrame(loop);
 }
-function toResult(){G.over=true;cancelAnimationFrame(raf);audioStop();leave();show(vResult());}
+function toResult(){G.over=true;cancelAnimationFrame(raf);audioStop();leave();show(vResult());if(netOpen())netSend(helloMsg());}
 function leave(){try{if(document.fullscreenElement)document.exitFullscreen().catch(function(){});}catch(e){}}
 function setLever(y){inp.lever=clamp((H*.82-y)/(H*.58),0,1);}
 function onKnob(q){var ky=H*.82-H*.58*inp.lever;return Math.abs(q[0]-40)<34&&q[1]>H*.24-30&&q[1]<H*.82+30;}
@@ -719,11 +751,12 @@ window.addEventListener('resize',function(){if(document.body.classList.contains(
 app.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;var a=el.getAttribute('data-a'),k=el.getAttribute('data-k'),ce=document.getElementById('code');
   if(ce)cfg.code=ce.value;
-  if(a==='pre'){cfg.pre=k;cfg.stats=null;cfg.codeMsg='';show(vTitle());if(netOpen())netSend({k:'hello',name:myName(),course:cfg.course});}
+  if(a==='pre'){cfg.pre=k;cfg.stats=null;cfg.codeMsg='';show(vTitle());if(netOpen())netSend(helloMsg());}
   else if(a==='lv'){cfg.lv=k;show(vTitle());}
   else if(a==='view'){cfg.view=k;show(vTitle());}
-  else if(a==='course'){cfg.course=+k;show(vTitle());if(netOpen())netSend({k:'hello',name:myName(),course:cfg.course});}
+  else if(a==='course'){cfg.course=+k;show(vTitle());if(netOpen())netSend(helloMsg());}
   else if(a==='tilt'){cfg.tilt=+k;show(vTitle());}
+  else if(a==='title2'){show(vTitle());}
   else if(a==='free'){cfg.free=true;audioInit();if(AU)AU.sec=0;start();}
   else if(a==='nethost'){audioInit();netHost();}
   else if(a==='netjoin'){audioInit();var rm=document.getElementById('room');netJoin(rm?rm.value:'');}
@@ -732,6 +765,7 @@ app.addEventListener('click',function(ev){
     if(navigator.share){navigator.share({title:'艇魂 操作レース',text:'艇魂で対戦しよう（部屋番号 '+NET.code+'）',url:u}).catch(function(){});}
     else{try{navigator.clipboard.writeText(u).then(okc,function(){NET.copied='コピーできなかった。下のリンクを長押しでコピーしてほしい。';refreshTitle();});}catch(e){NET.copied='下のリンクを長押しでコピーしてほしい。';refreshTitle();}}}
   else if(a==='netstart')netStart();
+  else if(a==='netready'){NET.ready=!NET.ready;netSend(helloMsg());netReadyCheck();show(vTitle());}
   else if(a==='load'){var d=decode(cfg.code);if(d){cfg.stats=d;cfg.codeMsg=esc(d.name)+' を読み込んだ。';}else{cfg.stats=null;cfg.codeMsg='コードが読み取れなかった。本編の「セーブコード」で出した文字を全部貼り付けてほしい。';}show(vTitle());}
   else if(a==='go'){cfg.free=false;audioInit();if(AU)AU.sec=99;start();}
   else if(a==='title')show(vTitle());
