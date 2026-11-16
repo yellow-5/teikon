@@ -58,7 +58,7 @@ td.r{text-align:right}
 (function(){
 'use strict';
 /* ---------- コースと物理（画面に依存しない部分） ---------- */
-var D=450,RR=95,LAP=4*D+2*Math.PI*RR,WX=920,WY=620,INF=30,LAPS=3,T0=-7.5,LS=34;
+var D=450,RR=95,LAP=4*D+2*Math.PI*RR,WX=920,WY=700,INF=30,LAPS=3,T0=-7.5,LS=46;
 var COL=['#ffffff','#1a1a1a','#e0352b','#1f5fd1','#f5c518','#1c9a4b'],TXC=['#111','#fff','#fff','#fff','#111','#fff'];
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function rnd(a,b){return a+Math.random()*(b-a);}
@@ -124,12 +124,12 @@ function step(G,dt,inp){
     var idx=order.indexOf(a),sg=seg(a.tot),first=a.tot<D+Math.PI*RR+40,tg,K=1;
     if(a.tot<D*.3)tg=(a.no-1)*LS;
     else if(first){tg=LINES[a.line];}
-    else tg=6+idx*15;
+    else tg=6+idx*19;
     if(inTurn(a.tot)&&a.tot>0)K=Kof(a.off);
     /* 前の相手の引き波・自分の艇をよける */
     order.forEach(function(o){if(o===a)return;var ds=o.tot-a.tot;
       if(ds>6&&ds<60&&Math.abs(o.off-a.off)<9)K*=.94;
-      if(Math.abs(ds)<28&&Math.abs(o.off-a.off)<18&&(ds>0||(ds===0&&o.no<a.no)))tg=Math.max(tg,o.off+21);});
+      if(Math.abs(ds)<28&&Math.abs(o.off-a.off)<18&&(ds>0||(ds===0&&o.no<a.no)))tg=Math.max(tg,o.off+24);});
     var cap=1e9;
     PL.forEach(function(pl){var dp=pl.tot-a.tot;
       if(dp>4&&dp<70&&Math.abs(pl.off-a.off)<10)K*=.93;
@@ -137,7 +137,7 @@ function step(G,dt,inp){
       if(inTurn(a.tot)&&a.tot>0&&dp>-8&&dp<46&&pl.off>a.off+8&&pl.off<a.off+56)K*=.88;
       if(dp>-8&&dp<48&&Math.abs(pl.off-a.off)<18)tg=pl.off>=a.off&&pl.off>=22?pl.off-22:pl.off+22;
       if(dp>0&&dp<19&&Math.abs(pl.off-a.off)<11)cap=Math.min(cap,Math.max(pl.v*.98,40));});
-    a.off+=(clamp(tg,0,210)-a.off)*Math.min(1,dt*1.5);
+    a.off+=(clamp(tg,0,270)-a.off)*Math.min(1,dt*1.5);
     var target=G.t>=a.go?a.vI*K*(1+Math.sin(G.t*1.7+a.wob)*.012):0;
     a.v+=(target-a.v)*(a.v<target?1.1:2.4)*dt;
     a.v=Math.min(a.v,cap);
@@ -540,7 +540,7 @@ function wheel(){
 }
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
 var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
-var VERSION='1116-2207',newer='';
+var VERSION='1116-2319',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL。入っていれば、端末同士の直接接続の代わりにこちらを使う（VPNでも通る） */
