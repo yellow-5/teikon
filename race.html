@@ -545,7 +545,7 @@ function fbUrl(k){return FB_URL+'/rooms/'+NET.code+'/'+k+'.json';}
 function fbPut(k,o){return fetch(fbUrl(k),{method:'PUT',body:JSON.stringify(o)});}
 function fbMsg(key,d,initial){
   if(!d||typeof d!=='object')return;
-  if(key==='hello'){if(!NET.linked){NET.linked=true;NET.busy=false;NET.msg='';nlog('相手とつながった');}netData({k:'hello',name:d.name,course:d.course});}
+  if(key==='hello'){if(!NET.linked){NET.linked=true;NET.busy=false;NET.msg='';nlog('相手とつながった');}netData({k:'hello',name:d.name,course:d.course,ready:d.ready});}
   else if(key==='start'){if(initial||d.id===NET.startId){NET.startId=d.id;return;}NET.startId=d.id;d.k='start';netData(d);}
   else if(key==='s'&&!initial){d.k='s';netData(d);}
   else if(key==='soon'&&!initial){d.k='soon';netData(d);}
