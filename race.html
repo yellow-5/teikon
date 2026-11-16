@@ -466,7 +466,7 @@ function wheel(){
 }
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
 var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
-var FB_URL=''; /* 中継用データベースのURL。入っていれば、端末同士の直接接続の代わりにこちらを使う（VPNでも通る） */
+var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL。入っていれば、端末同士の直接接続の代わりにこちらを使う（VPNでも通る） */
 function netOpen(){return FB_URL?!!NET.linked:!!(NET.conn&&NET.conn.open);}
 function fbUrl(k){return FB_URL+'/rooms/'+NET.code+'/'+k+'.json';}
 function fbPut(k,o){return fetch(fbUrl(k),{method:'PUT',body:JSON.stringify(o)});}
