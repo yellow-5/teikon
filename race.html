@@ -221,8 +221,9 @@ function vTitle(){
   '<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>'+
   '<div class="card stack" id="netbox" style="padding:12px"><span class="lbl">友達とリアルタイム対戦（2人）</span>'+
   (NET.role==='host'&&!NET.busy?'<p>部屋番号 <b class="disp" style="font-size:30px;letter-spacing:.12em">'+NET.code+'</b></p>'+
-     (NET.info?'<p style="font-weight:900">'+esc(NET.info.name)+' が入室した。</p><button class="btn red" data-a="netstart">対戦を始める</button>':'<p class="sub">この番号を友達に伝える。友達が入るまで、この画面のまま待つ。</p>')+'<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を閉じる</button>'
-   :NET.role==='guest'&&NET.conn&&NET.conn.open?'<p style="font-weight:900">部屋 '+NET.code+' に入った。</p><p class="sub">部屋を作った人が「対戦を始める」を押すとレースが始まる。選手・コース・チルト・視点は今のうちに選んでおく。</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を出る</button>'
+     (NET.info?'<p style="font-weight:900">'+esc(NET.info.name)+' が入室した。'+(NET.auto?'まもなく自動で始まる。':'')+'</p><button class="btn red" data-a="netstart">'+(NET.auto?'今すぐ始める':'対戦を始める')+'</button>'
+       :'<p class="sub">友達に招待リンクを送る。友達がリンクを開くと自動で部屋に入り、5秒後にレースが自動で始まる。番号を伝えて入力してもらってもよい。</p><button class="btn" data-a="netshare">招待リンクを送る</button>'+(NET.copied?'<p class="sub" style="font-weight:900;color:var(--ink)">'+NET.copied+'</p>':'')+'<p class="sub" style="-webkit-user-select:text;user-select:text;overflow-wrap:anywhere">'+inviteUrl()+'</p><p class="sub">送ったあとは、この画面に戻って待つ。画面を閉じると部屋も閉じる。</p>')+'<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を閉じる</button>'
+   :NET.role==='guest'&&NET.conn&&NET.conn.open?'<p style="font-weight:900">部屋 '+NET.code+' に入った。</p><p class="sub">まもなくレースが自動で始まる。この画面のまま待つ。</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を出る</button>'
    :NET.busy?'<p class="sub">'+NET.msg+'</p>'
    :'<button class="btn" data-a="nethost">部屋を作る</button><label class="lbl" for="room">友達の部屋に入る</label><input type="text" id="room" inputmode="numeric" maxlength="4" placeholder="4けたの部屋番号" autocomplete="off"><button class="btn ghost" data-a="netjoin" style="padding:9px;font-size:14px">部屋に入る</button>')+
   (NET.msg&&!NET.busy?'<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>':'')+
@@ -463,7 +464,8 @@ function wheel(){
   cx.restore();
 }
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
-var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false};
+var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
+function inviteUrl(){return location.origin+location.pathname+'?room='+NET.code;}
 function myName(){return cfg.stats?cfg.stats.name:PRE[cfg.pre].name;}
 function netLib(cb){
   if(window.Peer){cb();return;}
@@ -472,7 +474,7 @@ function netLib(cb){
 }
 function refreshTitle(){if(!document.body.classList.contains('racing')&&document.getElementById('netbox'))show(vTitle());}
 function netClose(m){try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer)NET.peer.destroy();}catch(e){}
-  NET.peer=null;NET.conn=null;NET.role=null;NET.info=null;NET.busy=false;NET.msg=m||'';if(G&&G.rp&&!G.over){G.rp.gone=true;say(G,'相手が切断');}refreshTitle();}
+  clearTimeout(NET.auto);NET.auto=0;NET.copied='';NET.peer=null;NET.conn=null;NET.role=null;NET.info=null;NET.busy=false;NET.msg=m||'';if(G&&G.rp&&!G.over){G.rp.gone=true;say(G,'相手が切断');}refreshTitle();}
 function netWire(conn){
   NET.conn=conn;
   conn.on('open',function(){NET.busy=false;NET.msg='';netSend({k:'hello',name:myName(),course:cfg.course});refreshTitle();});
@@ -487,8 +489,10 @@ function netHost(){
     NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';
     try{NET.peer=new Peer('teikon-race-'+NET.code);}catch(e){netClose('部屋を作れなかった。');return;}
     NET.peer.on('open',function(){NET.busy=false;NET.msg='';refreshTitle();});
+    NET.peer.on('disconnected',function(){var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
     NET.peer.on('connection',function(c){if(NET.conn&&NET.conn.open){try{c.close();}catch(e){}return;}netWire(c);});
-    NET.peer.on('error',function(e){netClose(e&&e.type==='unavailable-id'?'部屋番号が重なった。もう一度「部屋を作る」を押してほしい。':'部屋を作れなかった。時間をおいて試してほしい。');});
+    NET.peer.on('error',function(e){var t=e&&e.type;if(NET.conn&&NET.conn.open)return;if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error'){return;}
+      netClose(t==='unavailable-id'?'部屋番号が重なった。もう一度「部屋を作る」を押してほしい。':'部屋を作れなかった。時間をおいて試してほしい。');});
   });
 }
 function netJoin(code){
@@ -497,13 +501,27 @@ function netJoin(code){
   netLib(function(){
     NET.role='guest';
     try{NET.peer=new Peer();}catch(e){netClose('接続できなかった。');return;}
-    NET.peer.on('open',function(){netWire(NET.peer.connect('teikon-race-'+code,{reliable:false}));
-      setTimeout(function(){if(NET.role==='guest'&&(!NET.conn||!NET.conn.open))netClose('部屋に入れなかった。番号が合っているか、相手が部屋を開いたままか確かめてほしい。');},12000);});
-    NET.peer.on('error',function(e){netClose(e&&e.type==='peer-unavailable'?'その番号の部屋が見つからなかった。':'接続できなかった。時間をおいて試してほしい。');});
+    NET.tries=0;
+    function attempt(){
+      if(NET.role!=='guest'||!NET.peer||(NET.conn&&NET.conn.open))return;
+      NET.tries++;NET.msg='部屋に入っている…（'+NET.tries+'回目）';refreshTitle();
+      try{if(NET.conn){var old=NET.conn;NET.conn=null;old.close();}}catch(e){}
+      try{netWire(NET.peer.connect('teikon-race-'+code,{reliable:true,serialization:'json'}));}catch(e){}
+      setTimeout(function(){
+        if(NET.role!=='guest'||(NET.conn&&NET.conn.open))return;
+        if(NET.tries<4)attempt();else netClose('部屋に入れなかった。番号が合っているか、相手が部屋の画面を開いたままか確かめてほしい。2人ともスマホの回線だとつながりにくいので、どちらかをWi-Fiにすると入れることがある。');
+      },6000);
+    }
+    NET.peer.on('open',attempt);
+    NET.peer.on('error',function(e){var t=e&&e.type;if(NET.conn&&NET.conn.open)return;
+      if(t==='peer-unavailable'){if(NET.tries>=4)netClose('その番号の部屋が見つからなかった。相手が部屋の画面を開いたままか確かめてほしい。');return;}
+      if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error')return;
+      netClose('接続できなかった。時間をおいて試してほしい。');});
   });
 }
 function netStart(){
   if(NET.role!=='host'||!NET.info)return;
+  clearTimeout(NET.auto);NET.auto=0;
   var hc=cfg.course||Math.floor(rnd(1,7)),gc=NET.info.course;
   if(!gc||gc===hc){do{gc=Math.floor(rnd(1,7));}while(gc===hc);}
   cfg.free=false;audioInit();if(AU)AU.sec=99;
@@ -512,7 +530,9 @@ function netStart(){
 }
 function netData(d){
   if(!d||typeof d!=='object')return;
-  if(d.k==='hello'){NET.info={name:String(d.name||'友達').slice(0,10),course:Number(d.course)||0};refreshTitle();}
+  if(d.k==='hello'){var first=!NET.info;NET.info={name:String(d.name||'友達').slice(0,10),course:Number(d.course)||0};
+    if(first&&NET.role==='host'&&!document.body.classList.contains('racing')){clearTimeout(NET.auto);NET.autoAt=Date.now()+5000;NET.auto=setTimeout(function(){NET.auto=0;if(!document.body.classList.contains('racing'))netStart();},5000);}
+    refreshTitle();}
   else if(d.k==='start'&&NET.role==='guest'){cfg.free=false;if(AU)AU.sec=99;start({my:Number(d.you)||1,rpNo:Number(d.host)||2,aiDefs:Array.isArray(d.ai)?d.ai:[]});}
   else if(d.k==='s'&&G&&G.rp&&!G.over){
     var r=G.rp,q=d.p;if(!Array.isArray(q))return;
@@ -612,7 +632,7 @@ function toResult(){G.over=true;cancelAnimationFrame(raf);audioStop();leave();sh
 function leave(){try{if(document.fullscreenElement)document.exitFullscreen().catch(function(){});}catch(e){}}
 function setLever(y){inp.lever=clamp((H*.82-y)/(H*.58),0,1);}
 function onKnob(q){var ky=H*.82-H*.58*inp.lever;return Math.abs(q[0]-40)<34&&q[1]>H*.24-30&&q[1]<H*.82+30;}
-function pd(e){e.preventDefault();var q=pt(e);
+function pd(e){e.preventDefault();audioInit();var q=pt(e);
   if(q[0]>108&&q[0]<174&&q[1]<44){G.over=true;cancelAnimationFrame(raf);audioStop();leave();show(vTitle());return;}
   try{cv.setPointerCapture(e.pointerId);}catch(x){}
   if(q[0]>176&&q[0]<236&&q[1]<44){sndOn=!sndOn;if(sndOn)audioInit();return;}
@@ -632,6 +652,7 @@ function loop(now){
   raf=requestAnimationFrame(loop);
 }
 var keys={left:false,right:false,lever:false,used:false};
+document.addEventListener('visibilitychange',function(){if(!document.hidden&&NET.peer&&NET.peer.disconnected&&!NET.peer.destroyed){try{NET.peer.reconnect();}catch(e){}}});
 window.addEventListener('resize',function(){if(document.body.classList.contains('racing')){size();if(G)draw(.016);}});
 app.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;var a=el.getAttribute('data-a'),k=el.getAttribute('data-k'),ce=document.getElementById('code');
@@ -645,6 +666,9 @@ app.addEventListener('click',function(ev){
   else if(a==='nethost'){audioInit();netHost();}
   else if(a==='netjoin'){audioInit();var rm=document.getElementById('room');netJoin(rm?rm.value:'');}
   else if(a==='netclose')netClose('');
+  else if(a==='netshare'){var u=inviteUrl(),okc=function(){NET.copied='リンクをコピーした。LINEなどに貼り付けて送る。';refreshTitle();};
+    if(navigator.share){navigator.share({title:'艇魂 操作レース',text:'艇魂で対戦しよう（部屋番号 '+NET.code+'）',url:u}).catch(function(){});}
+    else{try{navigator.clipboard.writeText(u).then(okc,function(){NET.copied='コピーできなかった。下のリンクを長押しでコピーしてほしい。';refreshTitle();});}catch(e){NET.copied='下のリンクを長押しでコピーしてほしい。';refreshTitle();}}}
   else if(a==='netstart')netStart();
   else if(a==='load'){var d=decode(cfg.code);if(d){cfg.stats=d;cfg.codeMsg=esc(d.name)+' を読み込んだ。';}else{cfg.stats=null;cfg.codeMsg='コードが読み取れなかった。本編の「セーブコード」で出した文字を全部貼り付けてほしい。';}show(vTitle());}
   else if(a==='go'){cfg.free=false;audioInit();if(AU)AU.sec=99;start();}
@@ -663,7 +687,7 @@ if(dm){var vm=/view=(\w+)/.exec(location.search);cfg.view=vm?vm[1]:'back';if(/fr
     inp.lever=.2;ev('pointerdown',40,H*.5);out.push(inp.lever.toFixed(2));ev('pointermove',40,H*.3);out.push(inp.lever.toFixed(2));ev('pointerup',40,H*.3);out.push(inp.lever.toFixed(2));
     ev('pointerdown',200,H*.7);ev('pointermove',200,H*.5);out.push(inp.lever.toFixed(2));ev('pointerup',200,H*.5);
     ev('pointerdown',W-100,H-50);ev('pointermove',W-60,H-50);out.push(inp.steer.toFixed(2));ev('pointerup',W-60,H-50);out.push(inp.steer.toFixed(2));document.title='PT '+out.join(' ');}
-}else show(vTitle());
+}else{show(vTitle());var rmm=/[?&]room=(\d{4})/.exec(location.search);if(rmm)netJoin(rmm[1]);}
 })();
 </script>
 </body>
