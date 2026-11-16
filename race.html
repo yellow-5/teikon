@@ -746,15 +746,11 @@ function hud(){
       cx.font='900 12px sans-serif';cx.lineWidth=3;cx.strokeStyle='rgba(16,33,46,.7)';cx.strokeText('そのまま走り続けることもできる',W/2,H*.3+70);cx.fillStyle='#fff';cx.fillText('そのまま走り続けることもできる',W/2,H*.3+70);}
   }
   if(G.cut&&!G.finished){var ce=G.t-G.cut.at;
-    if(ce<1.6){var ck=ce<.16?ce/.16:ce>1.35?(1.6-ce)/.25:1;
-      cx.save();cx.translate(W/2,H*.42);cx.rotate(-.08);cx.globalAlpha=clamp(ck,0,1);
-      cx.fillStyle='#10212e';cx.fillRect(-W,-38,W*2,76);cx.fillStyle='#f5c518';cx.fillRect(-W,-44,W*2,6);cx.fillRect(-W,38,W*2,6);
-      cx.fillStyle='rgba(255,255,255,.07)';for(var cs2=-W;cs2<W;cs2+=28)cx.fillRect(cs2,-38,3,76);
-      cx.font='900 46px sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillStyle='#fff';cx.fillText(G.cut.t,(1-ck)*-90,-4);
-      cx.font='900 13px sans-serif';cx.fillStyle='#f5c518';cx.fillText(G.my+'号艇　'+G.cut.rank+'番手',(1-ck)*-60,27);
-      cx.restore();cx.textBaseline='alphabetic';}
+    if(ce<1.3){cx.globalAlpha=clamp(ce<.12?ce/.12:ce>1?(1.3-ce)/.3:1,0,1);
+      cx.font='900 26px sans-serif';cx.textAlign='center';cx.textBaseline='alphabetic';cx.lineWidth=5;cx.strokeStyle='#10212e';cx.strokeText(G.cut.t,W/2,H*.2);cx.fillStyle='#f5c518';cx.fillText(G.cut.t,W/2,H*.2);
+      cx.globalAlpha=1;}
   }
-  var big=G.finished||(G.cut&&G.t-G.cut.at<1.6)?'':G.msgT>0?G.msg:(G.stTime===null&&G.t>G.launch&&G.t<G.launch+1?'レバーを上げろ！':'');
+  var big=G.finished?'':G.msgT>0?G.msg:(G.stTime===null&&G.t>G.launch&&G.t<G.launch+1?'レバーを上げろ！':'');
   if(big){cx.font='900 26px sans-serif';cx.textAlign='center';cx.lineWidth=6;cx.strokeStyle='#fff';cx.strokeText(big,W/2,H*.3);cx.fillStyle=G.msgT>0?'#10212e':'#e0352b';cx.fillText(big,W/2,H*.3);}
 }
 function rrect(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();}
