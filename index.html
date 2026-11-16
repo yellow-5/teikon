@@ -129,6 +129,14 @@ canvas{display:block;max-width:100%}
 .scene h2{font-size:24px}
 .scene .tx{display:flex;flex-direction:column;gap:8px;font-size:15.5px}
 .scene .msg{font-weight:900}
+.help{display:flex;flex-direction:column;gap:10px}
+.help h3{font-family:var(--display);font-weight:400;font-size:18px;margin-top:8px;border-bottom:2px solid var(--ink);padding-bottom:3px}
+.help p,.help li{font-size:14px}
+.help ol,.help ul{padding-left:1.4em;display:flex;flex-direction:column;gap:4px}
+.help dt{font-weight:900;font-size:14.5px;margin-top:8px}
+.help dd{font-size:13.5px;color:var(--sub)}
+.help th{white-space:nowrap}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 /* カットイン */
 .cut{position:fixed;inset:0;z-index:9;display:flex;align-items:center;justify-content:center;background:rgba(16,33,46,.4);overflow:hidden}
 .cut .band{width:150%;flex:none;transform:rotate(-7deg);background-color:var(--ink);background-image:repeating-linear-gradient(90deg,transparent 0 26px,rgba(255,255,255,.08) 26px 29px);border-top:7px solid var(--b5);border-bottom:7px solid var(--b5);padding:20px 0 18px;text-align:center;color:#fff}
@@ -158,6 +166,7 @@ canvas{display:block;max-width:100%}
 var KEY='teikon-save', BEST='teikon-best';
 var RANK_URL='https://script.google.com/macros/s/AKfycbyEd-yun9g571RTKfF0A0HDrx8B3EUK50j8hm7JU89SKSvTzaBhL0udv5nknaoAZnZe0Q/exec'; /* ランキングの送り先。空のあいだはランキング機能を出さない */
 var rank={open:false,mode:'quick',list:null,msg:''};
+var help={open:false,tab:'rule'};
 var MOODS=['絶不調','不調','普通','好調','絶好調'], MULT=[0.7,0.85,1,1.15,1.3];
 var STATS=[['st','スタート'],['tn','ターン'],['mt','整備'],['mn','メンタル']];
 var TRAIN={
@@ -574,6 +583,7 @@ function applyResult(){
 /* ---------- 描画 ---------- */
 function render(){
   cancelAnimationFrame(raf);
+  if(help.open){app.innerHTML=vHelp();return;}
   if(rank.open){app.innerHTML=vRank();return;}
   if(!S){app.innerHTML=vTitle();return;}
   if(S.screen==='create'){app.innerHTML=vCreate();return;}
@@ -594,7 +604,7 @@ function vTitle(){
   '<h1>艇魂<small>ボートレーサー育成</small></h1>'+
   '<p>練習で能力を伸ばし、大時計に合わせてスタートを決め、1マークの勝負手を選ぶ。目指すは最高峰SGの優勝。短く遊ぶ「あっさり」と、物語と絵がつく「じっくり」を選べる。</p>'+
   '<div class="stack">'+(sv?'<button class="btn red" data-a="resume">つづきから（'+esc(when(sv.turn))+'）</button>':'')+
-  '<button class="btn'+(sv?' ghost':' red')+'" data-a="start">はじめから</button>'+(RANK_URL?'<button class="btn ghost" data-a="rank">ランキングを見る</button>':'')+'</div>'+
+  '<button class="btn'+(sv?' ghost':' red')+'" data-a="start">はじめから</button>'+'<button class="btn ghost" data-a="help">遊び方・用語</button>'+(RANK_URL?'<button class="btn ghost" data-a="rank">ランキングを見る</button>':'')+'</div>'+
   '<div class="stack"><label class="f" for="incode">セーブコードで再開</label><input type="text" id="incode" placeholder="コードを貼り付け" autocomplete="off">'+
   (titleMsg?'<p class="sub risk">'+titleMsg+'</p>':'')+'<button class="btn ghost" data-a="loadcode">コードから再開する</button></div>'+
   (b?'<div class="card best">最高記録　<b>'+esc(b.name)+'</b>　'+esc(b.k)+'級「'+esc(b.title)+'」　<span class="num">'+b.score+'点</span></div>':'')+
@@ -632,6 +642,53 @@ function vRank(){
     h+='</table></div><p class="sub">上位50人まで。公開を選んだ人の記録だけが載る。</p>';
   }
   return h+'<button class="btn ghost" data-a="rankx">もどる</button>';
+}
+function vHelp(){
+  var h='<div class="top"><div class="when">遊び方</div></div><div class="cmds">'+
+  '<button class="card opt" data-a="htab" data-k="rule" aria-pressed="'+(help.tab==='rule')+'"><b>ルール</b></button>'+
+  '<button class="card opt" data-a="htab" data-k="word" aria-pressed="'+(help.tab==='word')+'"><b>用語</b></button></div><div class="help">';
+  if(help.tab==='rule'){
+    h+='<h3>目的</h3><p>ボートレーサーを育てて、最高峰のレース「SG」での優勝を目指す。養成所で12か月、そのあとプロとして走る。</p>'+
+    '<h3>1か月の流れ</h3><ol><li>練習か休養を1つ選ぶ。練習すると能力が上がり、体力が減る</li><li>ときどきイベントが起きて、選択で能力が変わる</li><li>レースのある月は、練習の代わりにレースに出る</li></ol>'+
+    '<h3>能力は何に効くか</h3><div class="card" style="padding:2px 8px"><table>'+
+    '<tr><th>スタート</th><td>大時計の針がゆっくり回り、スタートを合わせやすくなる。逃げ・まくりが決まりやすくなる</td></tr>'+
+    '<tr><th>ターン</th><td>レースの地力が上がる。差し・まくり差し・全速ターンが決まりやすくなる。C以上で道中抜きが起きる</td></tr>'+
+    '<tr><th>整備</th><td>レースの地力が上がる。まくりが決まりやすくなる。じっくりではC以上でピット離れに挑める</td></tr>'+
+    '<tr><th>メンタル</th><td>レースの運に振り回されにくくなる。逃げ・差しが決まりやすくなる。モーター抽選で引き直しが効きやすくなる</td></tr>'+
+    '</table></div><p class="sub">能力はG・F・E・D・C・B・A・Sの8段階。高くなるほど伸びにくい。</p>'+
+    '<h3>体力と調子</h3><ul><li><b>体力</b>が60未満で練習すると転覆しやすく、転覆すると能力が下がる。25未満で転覆するとケガで1か月休み</li><li>体力50未満で出走すると走りが鈍る。0で出走すると9割がた転覆する</li><li><b>調子</b>が良いと練習の伸びが最大1.3倍、悪いと0.7倍。レースの強さにも効く</li><li>「教官」「師匠」の印がついた練習は伸びが1.3倍</li></ul>'+
+    '<h3>レースの流れ</h3><ol><li><b>モーター抽選</b>：良いモーターを引くと、そのレース中は全能力が上がる（◎+12%、○+6%、△変化なし、×−8%）</li><li><b>出走表</b>：自分の枠番を確かめる。内側ほど有利。じっくりではピット離れで内を奪いにいける</li><li><b>スタート</b>：「時計を動かす」を押し、黄色い針が真上の0に来た瞬間に「スタート！」を押す。0より早いとフライングで失格</li><li><b>1マーク</b>：決まり手を選ぶ。成功率が％で出る。内の艇よりスタートが早いほど、まくりが決まりやすい</li><li><b>道中抜き</b>：ときどき発生。印が緑の範囲に入った瞬間に押すと1つ前に出る</li></ol>'+
+    '<h3>級別</h3><p>プロはB2から始まる。決まった時期の「級別審査」で、それまでのレース成績をもとに1段ずつ上下する（B2→B1→A2→A1）。A1で最終戦を迎えるとSGに出られる。</p>'+
+    '<h3>モードと性格</h3><ul><li><b>あっさり</b>：全32か月・7戦。育成とレースだけ</li><li><b>じっくり</b>：全48か月・11戦。ライバルや師匠との物語、絵つきのイベント、ピット離れがある</li><li><b>性格</b>は入所時に自動で決まる。育成画面で性格の名前を押すと効果が見られる</li></ul>';
+  }else{
+    var W=[['枠番（わくばん）','1〜6号艇の番号。1号艇から白・黒・赤・青・黄・緑の色がつく。このゲームでは毎回くじで決まる'],
+    ['コース・進入','スタートのときに並ぶ位置。内側から1コース、2コース…と数える。ターンマークに近い内側ほど有利'],
+    ['ピット離れ','待機場所（ピット）から水面に出る動き。ここで飛び出すと、枠番より内側のコースを奪える'],
+    ['大時計','スタートの合図に使う大きな時計。黄色い針が真上の0を指した瞬間がスタート'],
+    ['ST（スタートタイミング）','0を指してから何秒後にスタートラインを通ったか。.10なら0.10秒後。小さいほど良い'],
+    ['フライング','0より早くスタートラインを越えること。失格になり、次の月は出走できない'],
+    ['スリット','スタートラインを通過する瞬間のこと。ここで前に出ているほど、1マークで有利になる'],
+    ['1マーク','スタートして最初に回るターンマーク。ここの攻防でほぼ着順が決まる'],
+    ['決まり手','1着を取った勝ち方のこと。下の5つがある'],
+    ['逃げ','1コースから先に回って、そのまま押し切る勝ち方'],
+    ['差し','前の艇の内側を小さく回って抜く勝ち方。2〜4コースで狙いやすい'],
+    ['まくり','外側から前の艇をまとめて抜き去る勝ち方。スタートで前に出ていることが条件'],
+    ['まくり差し','外からまくりにいき、艇と艇の間を割って入る勝ち方。5・6コースの本線'],
+    ['全速ターン','スピードを落とさずに回ること。決まれば大きく突き放せるが、流れやすい'],
+    ['道中（どうちゅう）','1マークを回ったあと、ゴールまでの間。ここで順位が入れ替わるのが「道中抜き」'],
+    ['モーター','ボートのエンジン。レースごとに抽選で割り当てられる。当たり外れが大きい'],
+    ['2連率','そのモーターが2着以内に入った割合。高いほど良いモーター'],
+    ['エース機','その場で一番出ているモーター。このゲームでは◎の評価'],
+    ['ペラ','プロペラのこと。叩いて形を変えると、伸びや回り足が変わる'],
+    ['転覆','ボートがひっくり返ること。レース中なら失格になる'],
+    ['級別','選手のランク。上からA1・A2・B1・B2。成績で半年ごとに入れ替わる'],
+    ['勝率','着順に応じた点数の平均。1着10点、2着8点、3着6点、4着4点、5着2点、6着1点'],
+    ['SG・G1・G2・G3・一般戦','レースの格。SGが最高峰で、強い選手しか出られない。賞金も格が上がるほど大きい'],
+    ['優勝戦','何日か続く開催の最後に、成績上位の6人で走る決勝のレース'],
+    ['養成所','ボートレーサーになるための学校。1年間の訓練を受けてからデビューする']];
+    h+='<dl>';W.forEach(function(w){h+='<dt>'+w[0]+'</dt><dd>'+w[1]+'</dd>';});h+='</dl>';
+  }
+  return h+'</div><button class="btn ghost" data-a="helpx">もどる</button>';
 }
 function vCreate(){
   var h='<div class="top"><div class="when">選手登録</div></div>'+
@@ -677,7 +734,7 @@ function vMain(){
     if(fr)h+='<p class="sub"><span class="risk">転覆の危険 '+fr+'%</span>　体力60未満の練習は転覆しやすく、能力が下がる。25未満ならケガで1か月休み。</p>';
   }
   h+='<div class="rule"></div><div class="log">'+S.log.map(function(l){return '<p>'+tx(esc(l))+'</p>';}).join('')+'</div>';
-  h+='<button class="btn ghost" data-a="code" style="padding:9px;font-size:13.5px">セーブコードを出す</button>';
+  h+='<div class="row2"><button class="btn ghost" data-a="help" style="padding:9px;font-size:13.5px">遊び方・用語</button><button class="btn ghost" data-a="code" style="padding:9px;font-size:13.5px">セーブコード</button></div>';
   if(codeOpen){
     h+='<div class="ov"><div class="card" role="dialog" aria-label="セーブコード"><h2>セーブコード</h2><p class="sub">このコードを控えておけば、タイトル画面の「セーブコードで再開」からいつでも続きができる。</p>'+
     '<input type="text" id="code" readonly value="'+enc()+'" style="font-size:13px"><button class="btn" data-a="copy">コピーする</button><button class="btn ghost" data-a="codex">閉じる</button></div></div>';
@@ -988,6 +1045,9 @@ app.addEventListener('click',function(ev){
   else if(a==='rank')loadRank(S&&S.mode==='deep'?'deep':'quick');
   else if(a==='rmode')loadRank(k);
   else if(a==='rankx'){rank.open=false;render();}
+  else if(a==='help'){help.open=true;help.tab='rule';render();window.scrollTo(0,0);}
+  else if(a==='htab'){help.tab=k;render();}
+  else if(a==='helpx'){help.open=false;render();}
   else if(a==='send')sendRank();
   else if(a==='persinfo'){persOpen=true;render();}
   else if(a==='persx'){persOpen=false;render();}
