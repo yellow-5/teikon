@@ -227,6 +227,7 @@ function vTitle(){
    :NET.busy?'<p class="sub">'+NET.msg+'</p>'
    :'<button class="btn" data-a="nethost">部屋を作る</button><label class="lbl" for="room">友達の部屋に入る</label><input type="text" id="room" inputmode="numeric" maxlength="4" placeholder="4けたの部屋番号" autocomplete="off"><button class="btn ghost" data-a="netjoin" style="padding:9px;font-size:14px">部屋に入る</button>')+
   (NET.msg&&!NET.busy?'<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>':'')+
+  (NLOG.length?'<p class="sub" style="font-weight:900;color:var(--ink)">通信の記録（うまくいかないときは、この部分の写真を送ってほしい）</p><pre id="nlog" class="sub" style="white-space:pre-wrap;font-family:inherit;line-height:1.45">'+esc(NLOG.join('\n'))+'</pre>':'')+
   '<p class="sub">2人が同じレースを同時に走る。残りの4艇はコンピューター。相手の強さは部屋を作った人の設定が使われる。コースが重なったら、入った人が別のコースになる。</p></div>'+
   '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、下げると減速して小さく回れる。指を離すと自動で下がる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
   '<p class="sub">能力の効き方：スタート＝加速、ターン＝旋回の鋭さと滑りにくさ、整備＝最高速、メンタル＝引き波と接触への強さ。Macでは ← → キーでハンドル、スペースキーを押している間レバー全開。</p>'+
@@ -465,22 +466,29 @@ function wheel(){
 }
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
 var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
+var NLOG=[],NT0=Date.now();
+function nlog(m){NLOG.push(((Date.now()-NT0)/1000).toFixed(1)+'秒 '+m);if(NLOG.length>14)NLOG.shift();var el=document.getElementById('nlog');if(el)el.textContent=NLOG.join('\n');}
 function inviteUrl(){return location.origin+location.pathname+'?room='+NET.code;}
 function myName(){return cfg.stats?cfg.stats.name:PRE[cfg.pre].name;}
 function netLib(cb){
   if(window.Peer){cb();return;}
+  nlog('通信の部品を読み込み中');
   var sc=document.createElement('script');sc.src='https://unpkg.com/peerjs@1.5.3/dist/peerjs.min.js';
-  sc.onload=cb;sc.onerror=function(){NET.busy=false;NET.role=null;NET.msg='通信の部品を読み込めなかった。通信の状態を確かめてほしい。';refreshTitle();};document.head.appendChild(sc);
+  sc.onload=function(){nlog('部品の読み込み 完了');cb();};sc.onerror=function(){nlog('部品の読み込み 失敗');NET.busy=false;NET.role=null;NET.msg='通信の部品を読み込めなかった。通信の状態を確かめてほしい。';refreshTitle();};document.head.appendChild(sc);
 }
 function refreshTitle(){if(!document.body.classList.contains('racing')&&document.getElementById('netbox'))show(vTitle());}
 function netClose(m){try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer)NET.peer.destroy();}catch(e){}
   clearTimeout(NET.auto);NET.auto=0;NET.copied='';NET.peer=null;NET.conn=null;NET.role=null;NET.info=null;NET.busy=false;NET.msg=m||'';if(G&&G.rp&&!G.over){G.rp.gone=true;say(G,'相手が切断');}refreshTitle();}
 function netWire(conn){
-  NET.conn=conn;
-  conn.on('open',function(){NET.busy=false;NET.msg='';netSend({k:'hello',name:myName(),course:cfg.course});refreshTitle();});
+  NET.conn=conn;nlog('相手との接続を開始');
+  var watch=function(){try{var pc=conn.peerConnection;if(pc&&!pc._tk){pc._tk=1;nlog('経路の状態 '+pc.iceConnectionState);pc.addEventListener('iceconnectionstatechange',function(){nlog('経路の状態 '+pc.iceConnectionState);});
+    pc.addEventListener('icecandidateerror',function(ev){if(!pc._ce){pc._ce=1;nlog('経路の候補でエラー '+(ev.errorCode||''));}});}}catch(e){}};
+  watch();setTimeout(watch,400);setTimeout(watch,1500);
+  conn.on('open',function(){nlog('相手とつながった');NET.busy=false;NET.msg='';netSend({k:'hello',name:myName(),course:cfg.course});refreshTitle();});
   conn.on('data',netData);
-  conn.on('close',function(){if(NET.conn===conn)netClose('相手との接続が切れた。');});
-  conn.on('error',function(){if(NET.conn===conn)netClose('通信でエラーが起きた。');});
+  conn.on('close',function(){nlog('接続が閉じた');if(NET.conn===conn&&conn._wasOpen)netClose('相手との接続が切れた。');});
+  conn.on('error',function(e){nlog('接続エラー '+(e&&(e.type||e.message)||''));if(NET.conn===conn&&conn._wasOpen)netClose('通信でエラーが起きた。');});
+  conn.on('open',function(){conn._wasOpen=true;});
 }
 function netSend(o){try{if(NET.conn&&NET.conn.open)NET.conn.send(o);}catch(e){}}
 function netHost(){
@@ -488,10 +496,10 @@ function netHost(){
   netLib(function(){
     NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';
     try{NET.peer=new Peer('teikon-race-'+NET.code);}catch(e){netClose('部屋を作れなかった。');return;}
-    NET.peer.on('open',function(){NET.busy=false;NET.msg='';refreshTitle();});
-    NET.peer.on('disconnected',function(){var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
-    NET.peer.on('connection',function(c){if(NET.conn&&NET.conn.open){try{c.close();}catch(e){}return;}netWire(c);});
-    NET.peer.on('error',function(e){var t=e&&e.type;if(NET.conn&&NET.conn.open)return;if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error'){return;}
+    NET.peer.on('open',function(id){nlog('中継サーバーに接続 '+id);NET.busy=false;NET.msg='';refreshTitle();});
+    NET.peer.on('disconnected',function(){nlog('中継サーバーから切断');var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
+    NET.peer.on('connection',function(c){nlog('相手から接続の申し込み');if(NET.conn&&NET.conn.open){try{c.close();}catch(e){}return;}netWire(c);});
+    NET.peer.on('error',function(e){var t=e&&e.type;nlog('エラー '+t);if(NET.conn&&NET.conn.open)return;if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error'){return;}
       netClose(t==='unavailable-id'?'部屋番号が重なった。もう一度「部屋を作る」を押してほしい。':'部屋を作れなかった。時間をおいて試してほしい。');});
   });
 }
@@ -504,17 +512,18 @@ function netJoin(code){
     NET.tries=0;
     function attempt(){
       if(NET.role!=='guest'||!NET.peer||(NET.conn&&NET.conn.open))return;
-      NET.tries++;NET.msg='部屋に入っている…（'+NET.tries+'回目）';refreshTitle();
+      NET.tries++;NET.msg='部屋に入っている…（'+NET.tries+'回目）';nlog('入室を試す '+NET.tries+'回目');refreshTitle();
       try{if(NET.conn){var old=NET.conn;NET.conn=null;old.close();}}catch(e){}
       try{netWire(NET.peer.connect('teikon-race-'+code,{reliable:true,serialization:'json'}));}catch(e){}
       setTimeout(function(){
         if(NET.role!=='guest'||(NET.conn&&NET.conn.open))return;
-        if(NET.tries<4)attempt();else netClose('部屋に入れなかった。番号が合っているか、相手が部屋の画面を開いたままか確かめてほしい。2人ともスマホの回線だとつながりにくいので、どちらかをWi-Fiにすると入れることがある。');
+        if(NET.tries<8)attempt();else netClose('部屋に入れなかった。番号が合っているか、相手が部屋の画面を開いたままか確かめてほしい。2人ともスマホの回線だとつながりにくいので、どちらかをWi-Fiにすると入れることがある。');
       },6000);
     }
-    NET.peer.on('open',attempt);
-    NET.peer.on('error',function(e){var t=e&&e.type;if(NET.conn&&NET.conn.open)return;
-      if(t==='peer-unavailable'){if(NET.tries>=4)netClose('その番号の部屋が見つからなかった。相手が部屋の画面を開いたままか確かめてほしい。');return;}
+    NET.peer.on('open',function(id){nlog('中継サーバーに接続 '+id);attempt();});
+    NET.peer.on('disconnected',function(){nlog('中継サーバーから切断');var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
+    NET.peer.on('error',function(e){var t=e&&e.type;nlog('エラー '+t);if(NET.conn&&NET.conn.open)return;
+      if(t==='peer-unavailable'){if(NET.tries>=8)netClose('その番号の部屋が見つからなかった。相手が部屋の画面を開いたままか確かめてほしい。');return;}
       if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error')return;
       netClose('接続できなかった。時間をおいて試してほしい。');});
   });
@@ -652,7 +661,13 @@ function loop(now){
   raf=requestAnimationFrame(loop);
 }
 var keys={left:false,right:false,lever:false,used:false};
-document.addEventListener('visibilitychange',function(){if(!document.hidden&&NET.peer&&NET.peer.disconnected&&!NET.peer.destroyed){try{NET.peer.reconnect();}catch(e){}}});
+var hidAt=0;
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden){hidAt=Date.now();return;}
+  if(!NET.peer||NET.peer.destroyed||(NET.conn&&NET.conn.open))return;
+  nlog('画面に戻った');
+  try{if(NET.peer.disconnected)NET.peer.reconnect();else if(NET.role==='host'&&Date.now()-hidAt>1500){nlog('中継サーバーにつなぎ直す');NET.peer.disconnect();}}catch(e){}
+});
 window.addEventListener('resize',function(){if(document.body.classList.contains('racing')){size();if(G)draw(.016);}});
 app.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;var a=el.getAttribute('data-a'),k=el.getAttribute('data-k'),ce=document.getElementById('code');
