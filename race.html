@@ -58,7 +58,7 @@ td.r{text-align:right}
 (function(){
 'use strict';
 /* ---------- コースと物理（画面に依存しない部分） ---------- */
-var D=450,RR=95,LAP=4*D+2*Math.PI*RR,WX=920,WY=700,INF=30,LAPS=3,T0=-7.5,LS=46;
+var D=450,RR=95,LAP=4*D+2*Math.PI*RR,WX=1020,WY=860,INF=30,LAPS=3,T0=-7.5,LS=56;
 var COL=['#ffffff','#1a1a1a','#e0352b','#1f5fd1','#f5c518','#1c9a4b'],TXC=['#111','#fff','#fff','#fff','#111','#fff'];
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function rnd(a,b){return a+Math.random()*(b-a);}
@@ -134,10 +134,14 @@ function step(G,dt,inp){
     PL.forEach(function(pl){var dp=pl.tot-a.tot;
       if(dp>4&&dp<70&&Math.abs(pl.off-a.off)<10)K*=.93;
       /* ツケマイ：外から並ぶか前に出て回ると、内の艇は引き波にはまって失速する */
-      if(inTurn(a.tot)&&a.tot>0&&dp>-8&&dp<46&&pl.off>a.off+8&&pl.off<a.off+56)K*=.88;
-      if(dp>-8&&dp<48&&Math.abs(pl.off-a.off)<18)tg=pl.off>=a.off&&pl.off>=22?pl.off-22:pl.off+22;
+      if(inTurn(a.tot)&&a.tot>0&&dp>-8&&dp<60&&pl.off>a.off+8&&pl.off<a.off+130)K*=pl.off<a.off+56?.86:.9;
+      /* 先行している艇の進路はふさがない：外の艇は間を空けるか後ろを回り、内の艇は内にとどまる */
+      if(dp>-14&&dp<95){
+        if(a.off>=pl.off){if(dp>30&&tg<pl.off-12){}else if(a.off-pl.off<70)tg=Math.max(tg,pl.off+48);}
+        else if(pl.off-a.off<60)tg=Math.max(0,Math.min(tg,pl.off-38));
+      }
       if(dp>0&&dp<19&&Math.abs(pl.off-a.off)<11)cap=Math.min(cap,Math.max(pl.v*.98,40));});
-    a.off+=(clamp(tg,0,270)-a.off)*Math.min(1,dt*1.5);
+    a.off+=(clamp(tg,0,330)-a.off)*Math.min(1,dt*1.5);
     var target=G.t>=a.go?a.vI*K*(1+Math.sin(G.t*1.7+a.wob)*.012):0;
     a.v+=(target-a.v)*(a.v<target?1.1:2.4)*dt;
     a.v=Math.min(a.v,cap);
@@ -159,7 +163,9 @@ function step(G,dt,inp){
   var lev=clamp(Number(inp.lever)||0,0,1),target=(G.stTime===null?lim*lev:lim*(.36+.64*lev))*slow;
   p.vF+=(target-p.vF)*(p.vF<target?p.acc:1.6)*dt;
   var steer=clamp(Number(inp.steer)||0,-1,1);
-  if(Math.abs(steer)>.02){p.h+=steer*p.turn*(1+.45*(1-lev))*dt*clamp(p.vF/60,.25,1);p.vF-=p.vF*(.36-.22*lev)*Math.abs(steer)*dt;}
+  /* 速いほど曲がりにくい：握ったままだと大きく回り、落とすと小さく回れる */
+  var tf=1-.36*clamp((p.vF-.5*lim)/(.5*lim),0,1);
+  if(Math.abs(steer)>.02){p.h+=steer*p.turn*tf*(1+.45*(1-lev))*dt*clamp(p.vF/60,.25,1);p.vF-=p.vF*(.8-.74*lev)*Math.abs(steer)*dt;}
   /* 向きを変えた分だけ横滑りが残る */
   var c=Math.cos(p.h),s=Math.sin(p.h),vx=p.vx||0,vy=p.vy||0,f=vx*c+vy*s,l=-vx*s+vy*c;
   f+=(p.vF-f)*Math.min(1,dt*6);l*=Math.exp(-p.grip*dt);
@@ -284,7 +290,7 @@ function vTitle(){
   (NET.role&&netOpen()?'':'<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>')+
   (NET.role?'':netBox())+
 
-  '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、下げると減速して小さく回れる。指を離すと自動で下がる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>選手の目線では、ハンドルを切った方向に視線が向く。画面下の「左を見る」「右を見る」を押している間は、真横まで見渡せる</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
+  '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、指を離すと自動で下がる</li><li><b>握ったままだと大きく回る（まくり向き）。レバーを落とすと小さく回れる（差し向き）</b>が、落とすほど立ち上がりで遅れる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>選手の目線では、ハンドルを切った方向に視線が向く。画面下の「左を見る」「右を見る」を押している間は、真横まで見渡せる</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
   '<p class="sub">能力の効き方：スタート＝加速、ターン＝旋回の鋭さと滑りにくさ、整備＝最高速、メンタル＝引き波と接触への強さ。Macでは ← → キーでハンドル、スペースキーを押している間レバー全開。</p>'+
   '<p class="sub"><a href="./">本編（育成）にもどる</a></p><p class="sub">版 '+VERSION+'</p>';
   return h;
@@ -540,7 +546,7 @@ function wheel(){
 }
 /* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
 var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
-var VERSION='1116-2319',newer='';
+var VERSION='1117-1136',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL。入っていれば、端末同士の直接接続の代わりにこちらを使う（VPNでも通る） */
@@ -768,7 +774,7 @@ function pt(e){return rot?[e.clientY,PW-e.clientX]:[e.clientX,e.clientY];}
 function start(o){
   o=o||{};if(o.rpNo){NET.ready=false;NET.auto=0;if(NET.info)NET.info.ready=false;}
   var cs=curStats(),avg=(cs.st+cs.tn+cs.mt+cs.mn)/4;
-  G=newRace({stats:cs,aiSpeed:167+(avg-45)*.48+LV[cfg.lv].v,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rpNo:o.rpNo,rpName:NET.info?NET.info.name:'友達',aiDefs:o.aiDefs});inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
+  G=newRace({stats:cs,aiSpeed:164+(avg-45)*.46+LV[cfg.lv].v,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rpNo:o.rpNo,rpName:NET.info?NET.info.name:'友達',aiDefs:o.aiDefs});inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
   show(vRace());document.body.classList.add('racing');cv=document.getElementById('cv');size();C.h=G.p.h;
   cv.addEventListener('pointerdown',pd);cv.addEventListener('pointermove',pm);cv.addEventListener('pointerup',pu);cv.addEventListener('pointercancel',pu);
   cv.addEventListener('contextmenu',function(e){e.preventDefault();});
