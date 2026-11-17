@@ -425,7 +425,7 @@ function tree(t,d){
 }
 function draw(dt){
   var p=G.p,i,j;
-  var V=VIEWS[cfg.view]||VIEWS.fp,fp=cfg.view==='fp';PIT=V.pit;C.sp=Math.sin(PIT);C.cp=Math.cos(PIT);C.z=V.z;
+  var V=(cfg.view==='fp'&&GLR&&GLR.hum)?FP3:(VIEWS[cfg.view]||VIEWS.fp),fp=cfg.view==='fp';PIT=V.pit;C.sp=Math.sin(PIT);C.cp=Math.cos(PIT);C.z=V.z;
   var dh=p.h-C.h;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;C.h+=dh*Math.min(1,(dt||.016)*V.rate);
   C.roll+=((-(p.steer||0)*V.roll*clamp(p.vF/120,0,1))-C.roll)*Math.min(1,(dt||.016)*5);
   C.c=Math.cos(C.h);C.s=Math.sin(C.h);C.look=(C.look||0)+((fp?(lookHold?lookHold*1.35:(p.steer||0)*.62):0)-(C.look||0))*Math.min(1,(dt||.016)*(lookHold?9:4));
@@ -546,7 +546,7 @@ function wheel(){
 /* ---------- 友達とのリアルタイム対戦（最大6人。中継用データベースを通すのでVPNでも通る） ---------- */
 var MAXP=6;
 var NET={role:null,code:'',me:'',host:'h',j:0,peers:{},msg:'',last:0,busy:false,auto:0,copied:'',linked:false,ready:false,startId:0,first:true,wr:false,es:null};
-var VERSION='1117-2153',newer='';
+var VERSION='1117-2206',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL */
@@ -809,15 +809,15 @@ var HUM=null,HUMLOAD=0;
 function loadHuman(){
   if(HUMLOAD)return;HUMLOAD=1;
   try{fetch('rider.bin?v='+VERSION).then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();}).then(function(ab){
-    var dv=new DataView(ab);if(dv.getUint8(0)!==84||dv.getUint8(3)!==49)return;
-    var nv=dv.getUint32(4,true),ni=dv.getUint32(8,true),o=28;
+    var dv=new DataView(ab);if(dv.getUint8(0)!==84||dv.getUint8(3)!==50)return;
+    var nv=dv.getUint32(4,true),ni=dv.getUint32(8,true),o=44;
     var pos=new Float32Array(ab.slice(o,o+nv*12));o+=nv*12;
     var nq=new Int8Array(ab.slice(o,o+nv*3));o+=nv*3;
     var reg=new Uint8Array(ab.slice(o,o+nv));o+=nv;o+=o%2;
     var idx=new Uint16Array(ab.slice(o,o+ni*2));
     var nrm=new Float32Array(nv*3);for(var i=0;i<nv*3;i++)nrm[i]=nq[i]/127;
-    HUM={nv:nv,ni:ni,pos:pos,nrm:nrm,reg:reg,idx:idx,hc:[dv.getFloat32(12,true),dv.getFloat32(16,true),dv.getFloat32(20,true)],hr:dv.getFloat32(24,true)};
-    if(GLR){humBuffers(GLR);if(G&&cv)try{draw(1/60);}catch(e){}}
+    HUM={nv:nv,ni:ni,pos:pos,nrm:nrm,reg:reg,idx:idx,hc:[dv.getFloat32(12,true),dv.getFloat32(16,true),dv.getFloat32(20,true)],hr:dv.getFloat32(24,true),wc:[dv.getFloat32(28,true),dv.getFloat32(32,true),dv.getFloat32(36,true)],wr:dv.getFloat32(40,true)};
+    if(GLR){humBuffers(GLR);if(G&&cv)try{draw(1/60);}catch(e){try{console.warn("draw",e&&e.message);}catch(x){}}}
   }).catch(function(){});}catch(e){}
 }
 function humBuffers(R){
@@ -825,13 +825,30 @@ function humBuffers(R){
   function b(t,d){var x=gl.createBuffer();gl.bindBuffer(t,x);gl.bufferData(t,d,gl.STATIC_DRAW);return x;}
   var H={p:b(gl.ARRAY_BUFFER,HUM.pos),n:b(gl.ARRAY_BUFFER,HUM.nrm),i:b(gl.ELEMENT_ARRAY_BUFFER,HUM.idx),c:[],helm:[],motor:[]};
   for(var no=1;no<=6;no++){var c=hex01(COL[no-1]);if(no===1)c=[.95,.96,.96];if(no===2)c=[.16,.18,.21];
-    var cc=new Float32Array(HUM.nv*3),RC=[c,[.13,.13,.15],[.2,.2,.23],c];
+    var cc=new Float32Array(HUM.nv*3),RC=[c,[.13,.13,.15],[.2,.2,.23],c,c];
     for(var v=0;v<HUM.nv;v++){var q=RC[HUM.reg[v]]||c;cc[v*3]=q[0];cc[v*3+1]=q[1];cc[v*3+2]=q[2];}
     H.c.push(b(gl.ARRAY_BUFFER,cc));
     var hm=buildBoat(no,'helmet');H.helm.push({b:b(gl.ARRAY_BUFFER,hm),n:hm.length/9});
     var mo=buildBoat(no,'motor');H.motor.push({b:b(gl.ARRAY_BUFFER,mo),n:mo.length/9});}
+  /* 選手目線で見える自分の前腕と手（ハンドルを握る部分）だけの三角形 */
+  var ai=[];for(var t=0;t<HUM.ni;t+=3){var ok=true;for(var k=0;k<3;k++){var g=HUM.reg[HUM.idx[t+k]];if(g!==1&&g!==4)ok=false;}if(ok)ai.push(HUM.idx[t],HUM.idx[t+1],HUM.idx[t+2]);}
+  H.ai=b(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(ai));H.an=ai.length;
+  var wm=buildWheel(HUM.wr);H.wheel={b:b(gl.ARRAY_BUFFER,wm),n:wm.length/9};
   R.hum=H;
 }
+/* 立体のハンドル（輪・3本のスポーク・中心）。輪の面が手前上を向くよう、あとで傾ける */
+function buildWheel(wr){
+  var M=new Mesh(),i,j,SEG=20,TS=6,tr=.26,dk=[.13,.14,.16],gr=[.3,.32,.35];
+  function rp(a,b){var ca=Math.cos(a),sa=Math.sin(a),cb=Math.cos(b),sb=Math.sin(b);return [(wr+tr*cb)*ca,(wr+tr*cb)*sa,tr*sb];}
+  for(i=0;i<SEG;i++)for(j=0;j<TS;j++){var a0=i/SEG*Math.PI*2,a1=(i+1)/SEG*Math.PI*2,b0=j/TS*Math.PI*2,b1=(j+1)/TS*Math.PI*2;
+    M.quad(rp(a0,b0),rp(a1,b0),rp(a1,b1),rp(a0,b1),i%5===0?gr:dk,null,[(wr)*Math.cos((a0+a1)/2),(wr)*Math.sin((a0+a1)/2),0]);}
+  [Math.PI/2,Math.PI*7/6,Math.PI*11/6].forEach(function(a){var c=Math.cos(a),s=Math.sin(a),px=-s*.16,py=c*.16;
+    M.quad([px,py,-.05],[-px,-py,-.05],[c*wr-px,s*wr-py,-.05],[c*wr+px,s*wr+py,-.05],gr,[0,0,1]);});
+  for(i=0;i<10;i++){var h0=i/10*Math.PI*2,h1=(i+1)/10*Math.PI*2;M.tri([0,0,.05],[Math.cos(h0)*.55,Math.sin(h0)*.55,.05],[Math.cos(h1)*.55,Math.sin(h1)*.55,.05],[.85,.12,.1],[0,0,1]);}
+  M.cone(0,0,-2.2,-.05,.22,.22,dk,8);
+  return new Float32Array(M.v);
+}
+var FP3={n:'目線',pit:.22,z:10.9,back:2.8,F:.36,cy:.5,rate:12,roll:.085};
 function glInit(canvas){
   var gl=null;try{gl=canvas.getContext('webgl',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});}catch(e){}
   if(!gl)return null;
@@ -904,6 +921,22 @@ function renderGL(hh,fp){
   G.ai.forEach(function(a){boat(a.x,a.y,a.h,a.no,0,true);});
   G.rps.forEach(function(r){if(!r.gone)boat(r.x,r.y,r.h,r.no,(r.steer||0)*1.6,true);});
   boat(p.x,p.y,p.h,G.my,(p.steer||0)*1.6,!fp);
+  if(fp&&R.hum){var HM=R.hum,bc=Math.cos(p.h),bs=Math.sin(p.h),lean=(p.steer||0)*1.6,
+      BM=new Float32Array([bc,bs,0,0,-bs,bc,lean*.11,0,0,0,1,0,p.x,p.y,0,1]),tl=.62,wa=(p.steer||0)*.6,
+      ct=Math.cos(tl),st=Math.sin(tl),cw=Math.cos(wa),sw=Math.sin(wa),wc=HUM.wc;
+    /* 傾き：輪の面の向き n=(-sin,0,cos)。横の軸 X=(0,1,0)、前上の軸 V=(cos,0,sin) */
+    var TL=new Float32Array([0,1,0,0, ct,0,st,0, -st,0,ct,0, wc[0],wc[1],wc[2],1]);
+    var RS=new Float32Array([cw,sw,0,0,-sw,cw,0,0,0,0,1,0,0,0,0,1]);
+    var WM=m4mul(BM,m4mul(TL,RS));
+    gl.uniformMatrix4fv(M.uM,false,WM);bindMesh(HM.wheel.b);gl.drawArrays(gl.TRIANGLES,0,HM.wheel.n);
+    /* 手と前腕もハンドルと一緒に回す：TL・RS・TLの逆（転置）で、ハンドルの軸まわりに回転 */
+    var TLi=new Float32Array([0,ct,-st,0, 1,0,0,0, 0,st,ct,0, 0,0,0,1]),T0=new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,-wc[0],-wc[1],-wc[2],1]);
+    var RS2=new Float32Array([Math.cos(wa*.35),Math.sin(wa*.35),0,0,-Math.sin(wa*.35),Math.cos(wa*.35),0,0,0,0,1,0,0,0,0,1]),AM=m4mul(BM,m4mul(TL,m4mul(RS2,m4mul(TLi,T0))));
+    gl.uniformMatrix4fv(M.uM,false,AM);
+    gl.bindBuffer(gl.ARRAY_BUFFER,HM.p);gl.vertexAttribPointer(M.aP,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,HM.n);gl.vertexAttribPointer(M.aN,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,HM.c[G.my-1]);gl.vertexAttribPointer(M.aC,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,HM.ai);gl.drawElements(gl.TRIANGLES,HM.an,gl.UNSIGNED_SHORT,0);}
   /* 水面 */
   var Wt=R.water;gl.useProgram(Wt.p);gl.bindBuffer(gl.ARRAY_BUFFER,R.wat);gl.enableVertexAttribArray(Wt.aP);gl.vertexAttribPointer(Wt.aP,3,gl.FLOAT,false,12,0);
   gl.uniformMatrix4fv(Wt.uVP,false,VP);gl.uniform3fv(Wt.uSun,SUN);gl.uniform3fv(Wt.uCam,e);gl.uniform3fv(Wt.uFog,FOGC);gl.uniform1f(Wt.uT,T);gl.drawArrays(gl.TRIANGLES,0,6);
@@ -953,7 +986,7 @@ function tags3(){
 }
 
 function fpOverlay(fp){
-  if(fp){wheel();beside();
+  if(fp){if(!(GLR&&GLR.hum))wheel();beside();
     var LB=lookBtn();cx.fillStyle=lookHold?'#f5c518':'rgba(255,255,255,.8)';cx.strokeStyle='#10212e';cx.lineWidth=2;rrect(LB[0],LB[1],LB[2],LB[3],10);cx.fill();cx.stroke();
     cx.fillStyle='#10212e';cx.font='900 14px sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('右を',LB[0]+LB[2]/2,LB[1]+LB[3]/2-9);cx.fillText('見る ▶',LB[0]+LB[2]/2,LB[1]+LB[3]/2+10);cx.textBaseline='alphabetic';}
 }

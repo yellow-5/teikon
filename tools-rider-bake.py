@@ -105,6 +105,8 @@ for side in 'lr':
     for f in ['index', 'middle', 'ring', 'pinky']:
         POSE[f + '_02_' + side] = (f + '_03_' + side, [0, -1, 0.15])
 posed = compute(POSE)
+HEADK = 1.65
+posed[name['Head']][:3, :3] *= HEADK
 for nm in ['pelvis', 'Head', 'hand_l', 'hand_r', 'calf_l', 'foot_l']:
     print('posed', nm, np.round(pos(posed, nm), 3))
 
@@ -137,6 +139,7 @@ for i, n in enumerate(jn):
     if any(f in n for f in ['hand', 'thumb', 'index', 'middle', 'ring', 'pinky']): region[i] = 1
     elif 'foot' in n or 'ball' in n: region[i] = 2
     elif n in ('Head', 'neck_01'): region[i] = 3
+    elif n.startswith('lowerarm'): region[i] = 4
 
 # ゲームの座標へ：前=+x、横=y、上=+z。単位は1m=8.6
 S = 8.6
@@ -151,16 +154,19 @@ pel = posed[name['pelvis']][:3, 3]
 dx = -4.9 - pel[2] * S; dz = 1.9 - kz
 gx += dx; gz += dz; hx += dx; hz += dz
 print('head center', round(hx, 2), round(hy, 2), round(hz, 2), 'z range', round(gz.min(), 2), round(gz.max(), 2), 'x range', round(gx.min(), 2), round(gx.max(), 2))
-helmet_c = (hx + 0.25, hy, hz + 0.9)
+helmet_c = (hx + 0.25 * HEADK, hy, hz + 0.9 * HEADK)
+hl = posed[name['hand_l']][:3, 3]
+wheel_c = (hl[2] * S + dx + 0.6, 0.0, hl[1] * S + dz + 0.1)
+print('wheel', [round(v, 2) for v in wheel_c], 'grip y', round(hl[0] * S, 2))
 
 with open(sys.argv[1] if len(sys.argv) > 1 else 'rider.bin', 'wb') as f:
     nv, ni = len(P), len(IDX)
-    f.write(struct.pack('<4sII4f', b'TKR1', nv, ni, helmet_c[0], helmet_c[1], helmet_c[2], 2.15))
+    f.write(struct.pack('<4sII8f', b'TKR2', nv, ni, helmet_c[0], helmet_c[1], helmet_c[2], 2.15 * HEADK, wheel_c[0], wheel_c[1], wheel_c[2], abs(hl[0] * S) + 0.15))
     f.write(np.c_[gx, gy, gz].astype(np.float32).tobytes())
     q = np.clip(np.round(np.c_[nx, ny, nz] * 127), -127, 127).astype(np.int8)
     f.write(q.tobytes())
     f.write(region.tobytes())
-    pad = (-(32 + nv * 12 + nv * 3 + nv)) % 2
+    pad = (-(44 + nv * 12 + nv * 3 + nv)) % 2
     f.write(b'\0' * pad)
     f.write(IDX.tobytes())
 np.save('/tmp/riderpts.npy', np.c_[gx, gy, gz, region])
