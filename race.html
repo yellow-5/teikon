@@ -290,7 +290,7 @@ function vTitle(){
   (NET.linked||NET.busy?'':'<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>')+
   (NET.role?'':netBox())+
 
-  '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、指を離すと自動で下がる</li><li><b>握ったままだと大きく回る（まくり向き）。レバーを落とすと小さく回れる（差し向き）</b>が、落とすほど立ち上がりで遅れる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>選手の目線では、ハンドルを切った方向に視線が向く。画面下のレバーを触っている指を左右になぞると、なぞった側の真横まで見渡せる（顔を横に向ける感覚）</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
+  '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、指を離すと自動で下がる</li><li><b>握ったままだと大きく回る（まくり向き）。レバーを落とすと小さく回れる（差し向き）</b>が、落とすほど立ち上がりで遅れる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>選手の目線では、ハンドルを切った方向に視線が向く。画面下のレバーのすぐ右の「右を見る」を押している間は、右の真横まで見渡せる</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
   '<p class="sub">能力の効き方：スタート＝加速、ターン＝旋回の鋭さと滑りにくさ、整備＝最高速、メンタル＝引き波と接触への強さ。Macでは ← → キーでハンドル、スペースキーを押している間レバー全開。</p>'+
   '<p class="sub"><a href="./">本編（育成）にもどる</a></p><p class="sub">版 '+VERSION+'</p>';
   return h;
@@ -545,7 +545,7 @@ function wheel(){
 /* ---------- 友達とのリアルタイム対戦（最大6人。中継用データベースを通すのでVPNでも通る） ---------- */
 var MAXP=6;
 var NET={role:null,code:'',me:'',host:'h',j:0,peers:{},msg:'',last:0,busy:false,auto:0,copied:'',linked:false,ready:false,startId:0,first:true,wr:false,es:null};
-var VERSION='1117-2033',newer='';
+var VERSION='1117-2102',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL */
@@ -913,8 +913,8 @@ function tags3(){
 
 function fpOverlay(fp){
   if(fp){wheel();beside();
-    cx.font='900 12px sans-serif';cx.textAlign='left';cx.textBaseline='alphabetic';cx.lineWidth=3;cx.strokeStyle='rgba(16,33,46,.5)';cx.globalAlpha=lookHold?1:.7;
-    var lt=lookHold<0?'◀ 左を見ている':lookHold>0?'右を見ている ▶':'◀ 左右になぞると横を見る ▶';cx.strokeText(lt,10,H-10);cx.fillStyle=lookHold?'#f5c518':'#fff';cx.fillText(lt,10,H-10);cx.globalAlpha=1;cx.textAlign='center';}
+    var LB=lookBtn();cx.fillStyle=lookHold?'#f5c518':'rgba(255,255,255,.8)';cx.strokeStyle='#10212e';cx.lineWidth=2;rrect(LB[0],LB[1],LB[2],LB[3],10);cx.fill();cx.stroke();
+    cx.fillStyle='#10212e';cx.font='900 14px sans-serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('右を',LB[0]+LB[2]/2,LB[1]+LB[3]/2-9);cx.fillText('見る ▶',LB[0]+LB[2]/2,LB[1]+LB[3]/2+10);cx.textBaseline='alphabetic';}
 }
 function panel(x,y,w,h){cx.fillStyle='rgba(16,33,46,.84)';cx.fillRect(x,y,w,h);}
 function hud(){
@@ -1025,9 +1025,11 @@ function pd(e){e.preventDefault();audioInit();var q=pt(e);
   if(q[0]>176&&q[0]<236&&q[1]<44){sndOn=!sndOn;if(sndOn)audioInit();return;}
   if(q[0]>242&&q[0]<314&&q[1]<44){cfg.view=VORD[(VORD.indexOf(cfg.view)+1)%VORD.length];return;}
   if(G.finished&&G.t-G.finAt>.6&&Math.abs(q[0]-W/2)<100&&q[1]>H*.3&&q[1]<H*.3+54){toResult();return;}
-  if(q[0]<W*.42){ptr[e.pointerId]=onKnob(q)?{k:'lev',lx:q[0]}:{k:'levr',y0:q[1],l0:inp.lever,lx:q[0]};if(onKnob(q))setLever(q[1]);}else ptr[e.pointerId]={k:'str',x0:q[0]-inp.steer*Math.min(W*.16,96)};}
-function pm(e){var o=ptr[e.pointerId];if(!o)return;e.preventDefault();var q=pt(e);if(o.lx!==undefined&&cfg.view==='fp'){var ldx=q[0]-o.lx;lookHold=Math.abs(ldx)<20?0:clamp((ldx-(ldx>0?20:-20))/60,-1,1);}if(o.k==='lev')setLever(q[1]);else if(o.k==='levr')inp.lever=clamp(o.l0+(o.y0-q[1])/(H*.5),0,1);else inp.steer=clamp((q[0]-o.x0)/Math.min(W*.16,96),-1,1);}
-function pu(e){var o=ptr[e.pointerId];if(!o)return;if(o.k==='str')inp.steer=0;if(o.lx!==undefined)lookHold=0;delete ptr[e.pointerId];}
+  if(cfg.view==='fp'){var LB=lookBtn();if(q[0]>LB[0]-6&&q[0]<LB[0]+LB[2]+6&&q[1]>LB[1]-6&&q[1]<LB[1]+LB[3]+6){ptr[e.pointerId]={k:'look'};lookHold=1;return;}}
+  if(q[0]<W*.42){ptr[e.pointerId]=onKnob(q)?{k:'lev'}:{k:'levr',y0:q[1],l0:inp.lever};if(onKnob(q))setLever(q[1]);}else ptr[e.pointerId]={k:'str',x0:q[0]-inp.steer*Math.min(W*.16,96)};}
+function pm(e){var o=ptr[e.pointerId];if(!o)return;e.preventDefault();var q=pt(e);if(o.k==='look')return;if(o.k==='lev')setLever(q[1]);else if(o.k==='levr')inp.lever=clamp(o.l0+(o.y0-q[1])/(H*.5),0,1);else inp.steer=clamp((q[0]-o.x0)/Math.min(W*.16,96),-1,1);}
+function pu(e){var o=ptr[e.pointerId];if(!o)return;if(o.k==='str')inp.steer=0;if(o.k==='look')lookHold=0;delete ptr[e.pointerId];}
+function lookBtn(){return [86,H*.5-30,66,60];}
 function loop(now){
   var dt=Math.min(.034,(now-last)/1000);last=now;
   if(keys.left||keys.right)inp.steer=(keys.right?1:0)-(keys.left?1:0);else if(keys.used&&!Object.keys(ptr).length)inp.steer=0;
