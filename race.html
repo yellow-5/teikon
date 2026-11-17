@@ -92,8 +92,8 @@ function pickLine(c){var r=Math.random();
   if(c===1)return 'in';if(c===2)return r<.7?'sashi':'makuri';if(c===3)return r<.5?'mz':'makuri';
   if(c===4)return r<.4?'mz':r<.75?'makuri':'sashi';if(c===5)return r<.6?'mz':r<.85?'sashi':'makuri';return r<.5?'mz':'sashi';}
 function newRace(cfg){
-  var st=cfg.stats,my=cfg.course||Math.floor(rnd(1,7)),free=!!cfg.free,tl=(cfg.tilt===undefined?-.5:cfg.tilt)+.5,ai=[],names=['潮崎','真壁','戸波','浦辺','磯貝','帆足','舵谷','早瀬','洲崎','千種'].sort(function(){return Math.random()-.5;});
-  for(var c=1;c<=6&&!free;c++)if(c!==my&&c!==cfg.rpNo){
+  var rpn=(cfg.rps||[]).map(function(r){return r.no;}),st=cfg.stats,my=cfg.course||Math.floor(rnd(1,7)),free=!!cfg.free,tl=(cfg.tilt===undefined?-.5:cfg.tilt)+.5,ai=[],names=['潮崎','真壁','戸波','浦辺','磯貝','帆足','舵谷','早瀬','洲崎','千種'].sort(function(){return Math.random()-.5;});
+  for(var c=1;c<=6&&!free;c++)if(c!==my&&rpn.indexOf(c)<0){
     var vI=cfg.aiSpeed*(1+rnd(-.035,.035)),sst=Math.random()<.07?rnd(.35,.55):rnd(.04,.27),run=c<=3?170:330;
     sst=Math.round(sst*100)/100;
     var def=cfg.aiDefs?cfg.aiDefs.filter(function(d){return d.no===c;})[0]:null;if(def){sst=def.st;}
@@ -105,7 +105,7 @@ function newRace(cfg){
     trail:[]};
   G.pass=[];G.turnT=0;G.exitAt=null;G.wasT=false;G.t1=false;G.cut=null;
   G.remoteAI=!!cfg.aiDefs;
-  if(cfg.rpNo){var rr0=cfg.rpNo<=3?170:330;G.rp={no:cfg.rpNo,name:cfg.rpName||'友達',x:-rr0,y:RR+(cfg.rpNo-1)*LS,h:0,vF:0,tot:-rr0,steer:0,fin:null,st:null,flying:false,trail:[],n:null};}
+  G.rps=(cfg.rps||[]).map(function(r){var rr0=r.no<=3?170:330;return {id:r.id,no:r.no,name:r.name||'友達',x:-rr0,y:RR+(r.no-1)*LS,h:0,vF:0,tot:-rr0,steer:0,fin:null,st:null,flying:false,gone:false,left:false,trail:[],n:null};});
   ai.forEach(function(a){var q=pathPos(a.tot,RR+a.off);a.x=q[0];a.y=q[1];a.h=q[2];});
   /* 手本の印：止まった状態から全開で出て、ST .05 で通過する動き */
   G.launch=.05-needTime(run0,G.p.vmax,G.p.acc);
@@ -119,8 +119,8 @@ function step(G,dt,inp){
   var pOff=latOff(p.x,p.y);
   /* 相手の艇：進入の型（逃げ・差し・まくり差し・まくり）ごとに回る線と速さが違う */
   var order=G.ai.slice().sort(function(a,b){return b.tot-a.tot;});
-  var PL=[{tot:p.tot,off:pOff,v:p.vF}];if(G.rp)PL.push({tot:G.rp.tot,off:latOff(G.rp.x,G.rp.y),v:G.rp.vF});
-  if(G.remoteAI)G.ai.forEach(function(a){a.tot+=a.v*dt*(inTurn(a.tot)&&a.tot>0?Math.pow(RR/(RR+a.off),.38):1);var q=pathPos(a.tot,RR+a.off);a.x=q[0];a.y=q[1];a.h=q[2];});
+  var PL=[{tot:p.tot,off:pOff,v:p.vF}];G.rps.forEach(function(r){if(!r.gone)PL.push({tot:r.tot,off:latOff(r.x,r.y),v:r.vF});});
+  if(G.remoteAI)G.ai.forEach(function(a){a.tot+=a.v*dt*(inTurn(a.tot)&&a.tot>0?Math.pow(RR/(RR+a.off),.38):1);var q=pathPos(a.tot,RR+a.off);a.x=q[0];a.y=q[1];a.h=q[2];if(a.fin===null&&a.tot>=LAPS*LAP)a.fin=G.t;});
   else G.ai.forEach(function(a){
     var idx=order.indexOf(a),sg=seg(a.tot),first=a.tot<D+Math.PI*RR+40,tg,K=1;
     if(a.tot<D*.3)tg=(a.no-1)*LS;
@@ -157,9 +157,9 @@ function step(G,dt,inp){
     if(d<17&&d>0.01){p.x+=dx/d*(17-d);p.y+=dy/d*(17-d);p.vF*=Math.pow(p.bump,dt*30);if(G.msgT<=0)say(G,'接触！');}
     if(a.v>30)for(var k=1;k<=7;k++){var w=pathPos(a.tot-18*k,RR+a.off);if(Math.abs(p.x-w[0])+Math.abs(p.y-w[1])<16+k){slow=Math.min(slow,p.wake+k*.02);}}
   });
-  if(G.rp&&!G.rp.gone){var rq=G.rp,rdx=p.x-rq.x,rdy=p.y-rq.y,rd=Math.sqrt(rdx*rdx+rdy*rdy);
+  G.rps.forEach(function(rq){if(rq.gone)return;var rdx=p.x-rq.x,rdy=p.y-rq.y,rd=Math.sqrt(rdx*rdx+rdy*rdy);
     if(rd<17&&rd>0.01){p.x+=rdx/rd*(17-rd)*.5;p.y+=rdy/rd*(17-rd)*.5;p.vF*=Math.pow(p.bump,dt*30);if(G.msgT<=0)say(G,'接触！');}
-    if(rq.vF>30)for(var rk=3;rk<rq.trail.length;rk+=3){var rw=rq.trail[rq.trail.length-1-rk];if(Math.abs(p.x-rw[0])+Math.abs(p.y-rw[1])<17){slow=Math.min(slow,p.wake+.04);break;}}}
+    if(rq.vF>30)for(var rk=3;rk<rq.trail.length;rk+=3){var rw=rq.trail[rq.trail.length-1-rk];if(Math.abs(p.x-rw[0])+Math.abs(p.y-rw[1])<17){slow=Math.min(slow,p.wake+.04);break;}}});
   if(slow<1&&G.msgT<=0&&G.t>1)say(G,'引き波');
   var lev=clamp(Number(inp.lever)||0,0,1),target=(G.stTime===null?lim*lev:lim*(.36+.64*lev))*slow;
   p.vF+=(target-p.vF)*(p.vF<target?p.acc:1.6)*dt;
@@ -188,13 +188,13 @@ function step(G,dt,inp){
       else say(G,'ST .'+String(Math.min(99,Math.round(G.t*100))).padStart(2,'0'));
     }
     if(G.stTime===null&&G.t>1.5&&!G.late){G.late=true;say(G,'出遅れ！');}
-    if(p.tot>=LAPS*LAP&&G.finTime===null){G.finTime=G.t;G.place=1+G.ai.filter(function(a){return a.fin!==null;}).length+(G.rp&&G.rp.fin!==null&&!G.rp.flying?1:0);G.finished=true;}
+    if(p.tot>=LAPS*LAP&&G.finTime===null){G.finTime=G.t;G.place=1+G.ai.filter(function(a){return a.fin!==null;}).length+G.rps.filter(function(r){return r.fin!==null&&!r.flying&&!r.left;}).length;G.finished=true;}
     if(G.t>100&&!G.finished){G.place=6;G.finished=true;}
   }
   /* 決まり手：ターンの前後で誰をどちら側から抜いたか */
   if(!G.free&&!G.finished&&G.stTime!==null){
     var inT=inTurn(p.tot)&&p.tot>0,po=latOff(p.x,p.y),oth=G.ai.map(function(a){return {o:a,tot:a.tot,off:a.off};});
-    if(G.rp&&!G.rp.gone)oth.push({o:G.rp,tot:G.rp.tot,off:latOff(G.rp.x,G.rp.y)});
+    G.rps.forEach(function(r){if(!r.gone)oth.push({o:r,tot:r.tot,off:latOff(r.x,r.y)});});
     if(inT)G.turnT=.9;else if(G.turnT>0)G.turnT-=dt;
     oth.forEach(function(x){var ah=p.tot>x.tot;if(x.o._pa===false&&ah&&(G.turnT>0||!G.t1)){var d=po-x.off;G.pass.push(d<-3?'s':d<38?'t':'m');}x.o._pa=ah;});
     if(G.wasT&&!inT)G.exitAt=G.t;
@@ -218,6 +218,7 @@ var LV={e:{name:'やさしい',sub:'好スタートなら勝てる',v:0},n:{name
 var cfg={pre:'d',lv:'e',code:'',codeMsg:'',stats:null,name:'あなた',view:'fp',course:0,tilt:-.5,free:false};
 var VIEWS={fp:{n:'目線',pit:.1,z:11.6,back:5.5,F:.34,cy:.56,rate:12,roll:.085},back:{n:'後ろ',pit:.25,z:27,back:70,F:.46,cy:.5,rate:4.5,roll:.045},high:{n:'上空',pit:.5,z:100,back:135,F:.5,cy:.5,rate:3.5,roll:.02}},VORD=['fp','back','high'];
 var G=null,inp={steer:0,lever:0},raf=0,last=0,cv=null,cx=null,W=0,H=0;
+window.TEIKON_DBG=function(){return {G:G,NET:NET,menuAct:menuAct};};
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function decode(code){try{var a=JSON.parse(decodeURIComponent(escape(atob(String(code).replace(/\s/g,'')))));
   var v=[a[3],a[4],a[5],a[6]].map(function(n){return clamp(Math.round(Number(n)||0),1,100);});
@@ -229,39 +230,33 @@ function loadNo(no){
     var v=d&&[d.st,d.tn,d.mt,d.mn].map(function(n){return clamp(Math.round(Number(n)||0),1,100);});
     if(!d||!d.name||v.some(function(n){return !n;})){cfg.stats=null;cfg.codeMsg='その番号の選手が見つからなかった。';}
     else{cfg.stats={name:String(d.name).slice(0,10),st:v[0],tn:v[1],mt:v[2],mn:v[3]};cfg.codeMsg=esc(cfg.stats.name)+' を読み込んだ。';try{localStorage.setItem('teikon-rno',no);}catch(e){}}
-    if(!document.body.classList.contains('racing'))show(vTitle());if(netOpen())netSend(helloMsg());
+    if(!document.body.classList.contains('racing'))show(vTitle());sendHello();
   }).catch(function(){cfg.codeMsg='読み込めなかった。通信の状態を確かめてほしい。';if(!document.body.classList.contains('racing'))show(vTitle());});
 }
 function curStats(){if(cfg.stats)return cfg.stats;var v=PRE[cfg.pre].v;return {st:v,tn:v,mt:v,mn:v};}
-function helloMsg(){return {k:'hello',name:myName(),course:cfg.course,ready:NET.ready?1:0,ver:VERSION};}
 function netBox(){
-  var h='<div class="card stack" id="netbox" style="padding:12px"><span class="lbl">友達とリアルタイム対戦（2人）</span>';
+  var h='<div class="card stack" id="netbox" style="padding:12px"><span class="lbl">友達とリアルタイム対戦（最大'+MAXP+'人）</span>';
   if(NET.busy)h+='<p class="sub">'+NET.msg+'</p>';
-  else if(NET.role&&netOpen()&&NET.info){
-    var same=cfg.course&&NET.info.course===cfg.course;
-    h+='<p style="font-weight:900">部屋 '+NET.code+'　'+esc(NET.info.name)+' と接続中</p>'+(NET.info.ver&&NET.info.ver!==VERSION?'<p class="sub" style="font-weight:900;color:var(--accent)">2人の版が違う（自分 '+VERSION+'／相手 '+esc(NET.info.ver)+'）。古いほうの人は、ページの一番上の「最新版に更新する」を押すか、ページを読み込み直してほしい。</p>':'')+
-    '<div class="card" style="padding:2px 8px"><table><tr><th></th><th>コース</th><th>準備</th></tr>'+
-    '<tr class="me"><td>自分</td><td>'+(cfg.course||'おまかせ')+'</td><td>'+(NET.ready?'OK':'選択中')+'</td></tr>'+
-    '<tr><td>'+esc(NET.info.name)+'</td><td>'+(NET.info.course||'おまかせ')+'</td><td>'+(NET.info.ready?'OK':'選択中')+'</td></tr></table></div>'+
-    (same?'<p class="sub" style="font-weight:900;color:var(--accent)">相手と同じコースを選んでいる。このままだと、部屋に入った人が別のコースになる。</p>':'')+
-    (NET.auto?'<p style="font-weight:900">2人とも準備OK。まもなく始まる。</p>'
-      :'<p class="sub">下で選手・コース・チルト・視点を選んでから「準備OK」を押す。2人とも準備OKになると、レースが自動で始まる。</p>')+
-    '<button class="btn '+(NET.ready?'ghost':'red')+'" data-a="netready">'+(NET.ready?'準備を取り消す':'準備OK')+'</button>'+
-    '<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">'+(NET.role==='host'?'部屋を閉じる':'部屋を出る')+'</button>';
-  }else if(NET.role==='host'){
-    h+='<p>部屋番号 <b class="disp" style="font-size:30px;letter-spacing:.12em">'+NET.code+'</b></p>'+
-    '<p class="sub">友達に招待リンクを送る。友達がリンクを開くと自動で部屋に入る。番号を伝えて入力してもらってもよい。</p><button class="btn" data-a="netshare">招待リンクを送る</button>'+
-    (NET.copied?'<p class="sub" style="font-weight:900;color:var(--ink)">'+NET.copied+'</p>':'')+
-    '<p class="sub" style="-webkit-user-select:text;user-select:text;overflow-wrap:anywhere">'+inviteUrl()+'</p>'+
-    '<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">部屋を閉じる</button>';
-  }else if(NET.role==='guest'){
-    h+='<p class="sub">部屋 '+NET.code+' に入っている…</p><button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">やめる</button>';
+  else if(NET.linked){
+    var M=members(),pl=peerList(),old=pl.filter(function(q){return q.ver&&q.ver!==VERSION;}),same=cfg.course&&pl.some(function(q){return q.course===cfg.course;});
+    h+='<p>部屋番号 <b class="disp" style="font-size:28px;letter-spacing:.12em">'+NET.code+'</b>　<b>'+M.length+'/'+MAXP+'人</b></p>';
+    if(old.length)h+='<p class="sub" style="font-weight:900;color:var(--accent)">版が違う人がいる（'+old.map(function(q){return esc(q.name)+' '+esc(q.ver);}).join('、')+'／自分 '+VERSION+'）。古いほうの人は、ページの一番上の「最新版に更新する」を押すか、ページを読み込み直してほしい。</p>';
+    h+='<div class="card" style="padding:2px 8px"><table><tr><th>選手</th><th>コース</th><th>準備</th></tr>';
+    M.forEach(function(m){h+='<tr'+(m.me?' class="me"':'')+'><td>'+(m.me?'自分':esc(m.name))+(m.id===NET.host?'<span class="sub">（部屋主）</span>':'')+'</td><td>'+(m.course||'おまかせ')+'</td><td>'+(m.ready?'OK':'選択中')+'</td></tr>';});
+    h+='</table></div>';
+    if(same)h+='<p class="sub" style="font-weight:900;color:var(--accent)">同じコースを選んでいる人がいる。先に部屋に入った人が優先で、あとの人は空いているコースになる。</p>';
+    if(NET.msg)h+='<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>';
+    if(M.length<2)h+='<p class="sub">友達が入るのを待っている。「招待リンクを送る」で友達を呼ぶ。</p>';
+    else h+=NET.auto?'<p style="font-weight:900">全員が準備OK。まもなく始まる。</p>':'<p class="sub">下で選手・コース・チルト・視点を選んでから「準備OK」を押す。全員が準備OKになると、レースが自動で始まる。</p>';
+    h+='<button class="btn '+(NET.ready?'ghost':'red')+'" data-a="netready">'+(NET.ready?'準備を取り消す':'準備OK')+'</button>';
+    if(M.length<MAXP)h+='<button class="btn ghost" data-a="netshare" style="padding:9px;font-size:14px">招待リンクを送る</button>'+(NET.copied?'<p class="sub" style="font-weight:900;color:var(--ink)">'+NET.copied+'</p>':'')+'<p class="sub" style="-webkit-user-select:text;user-select:text;overflow-wrap:anywhere">'+inviteUrl()+'</p>';
+    h+='<button class="btn ghost" data-a="netclose" style="padding:9px;font-size:14px">'+(NET.role==='host'?'部屋を閉じる（全員が退出）':'部屋を出る')+'</button>';
   }else{
     h+='<button class="btn" data-a="nethost">部屋を作る</button><label class="lbl" for="room">友達の部屋に入る</label><input type="text" id="room" inputmode="numeric" maxlength="4" placeholder="4けたの部屋番号" autocomplete="off"><button class="btn ghost" data-a="netjoin" style="padding:9px;font-size:14px">部屋に入る</button>';
   }
-  if(NET.msg&&!NET.busy)h+='<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>';
-  if(NLOG.length&&!(NET.role&&netOpen()))h+='<p class="sub" style="font-weight:900;color:var(--ink)">通信の記録（うまくいかないときは、この部分の写真を送ってほしい）</p><pre id="nlog" class="sub" style="white-space:pre-wrap;font-family:inherit;line-height:1.45">'+esc(NLOG.join('\n'))+'</pre>';
-  return h+'<p class="sub">2人が同じレースを同時に走る。残りの4艇はコンピューター。相手の強さは部屋を作った人の設定が使われる。</p></div>';
+  if(NET.msg&&!NET.busy&&!NET.linked)h+='<p class="sub" style="font-weight:900;color:var(--accent)">'+NET.msg+'</p>';
+  if(NLOG.length&&!NET.linked)h+='<p class="sub" style="font-weight:900;color:var(--ink)">通信の記録（うまくいかないときは、この部分の写真を送ってほしい）</p><pre id="nlog" class="sub" style="white-space:pre-wrap;font-family:inherit;line-height:1.45">'+esc(NLOG.join('\n'))+'</pre>';
+  return h+'<p class="sub">2〜'+MAXP+'人が同じレースを同時に走る。足りない分はコンピューター。相手の強さは部屋を作った人の設定が使われる。</p></div>';
 }
 function vTitle(){
   var s=curStats(),h='<h1>艇魂<small>操作レース 試作版</small></h1>'+
@@ -288,7 +283,7 @@ function vTitle(){
   '<button class="card opt" data-a="view" data-k="fp" aria-pressed="'+(cfg.view==='fp')+'">選手の目線<span>艇に乗った視点</span></button>'+
   '<button class="card opt" data-a="view" data-k="back" aria-pressed="'+(cfg.view==='back')+'">後ろから<span>艇全体が見える</span></button>'+
   '<button class="card opt" data-a="view" data-k="high" aria-pressed="'+(cfg.view==='high')+'">上空から<span>周りが見渡せる</span></button></div><p class="sub">レース中も左上の「視点」で切り替えられる。</p></div>'+
-  (NET.role&&netOpen()?'':'<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>')+
+  (NET.linked||NET.busy?'':'<button class="btn red" data-a="go">出走する</button><button class="btn ghost" data-a="free">フリー走行（相手なしで自由に走る）</button>')+
   (NET.role?'':netBox())+
 
   '<ol class="how"><li>画面の左側を上下になぞると<b>レバー（アクセル）</b>。上げるほど加速し、指を離すと自動で下がる</li><li><b>握ったままだと大きく回る（まくり向き）。レバーを落とすと小さく回れる（差し向き）</b>が、落とすほど立ち上がりで遅れる</li><li>画面の右側を左右になぞると<b>ハンドル</b>。指を離すとまっすぐに戻る。コースは左回り</li><li>最初は止まって待つ。隣の<b>黄色い印</b>が動き出したら、レバーを上げて並んで走る。印はちょうど良いスタートの手本</li><li>大時計の針が真上に来る前にスタートラインを越えるとフライングで失格</li><li>選手の目線では、ハンドルを切った方向に視線が向く。画面下の「左を見る」「右を見る」を押している間は、真横まで見渡せる</li><li>他の艇の後ろの白い波（引き波）に入ると遅くなる</li></ol>'+
@@ -304,12 +299,12 @@ function vResult(){
   '<p class="sub">'+(G.flying?'針が真上に来る前にスタートラインを越えた。黄色い印より前に出ないように。':G.place===1?'見事な1着。相手を強くしても勝てるか。':G.place<=3?'あと少し。ターンの入口でレバーを下げると小さく回れる。':'ターンで外に流れていないか。レバーを下げるタイミングを早めてみよう。')+'</p></div>';
   if(!G.flying){var rows=G.ai.map(function(a){return {no:a.no,name:a.name,t:a.fin===null?2000-a.tot/100:a.fin,st:a.st,me:false};});
     rows.push({no:G.my,name:cfg.stats?cfg.stats.name:PRE[cfg.pre].name,t:G.finTime===null?3000:G.finTime,st:G.stTime,me:true});
-    if(G.rp)rows.push({no:G.rp.no,name:G.rp.name+'（友達）',t:G.rp.flying?4000:G.rp.fin===null?2000-G.rp.tot/100:G.rp.fin,st:G.rp.flying?null:G.rp.st,me:false});
+    G.rps.forEach(function(r){rows.push({no:r.no,name:r.name+(r.left?'（棄権）':'（友達）'),t:r.flying||r.left?4000:r.fin===null?2000-r.tot/100:r.fin,st:r.flying?null:r.st,me:false});});
     rows.sort(function(a,b){return a.t-b.t;});
     h+='<div class="card" style="padding:2px 8px"><table><tr><th>着</th><th>枠</th><th>選手</th><th class="r">ST</th></tr>';
     rows.forEach(function(r,i){h+='<tr'+(r.me?' class="me"':'')+'><td class="num">'+(i+1)+'</td><td><span class="chip" style="background:'+COL[r.no-1]+';color:'+TXC[r.no-1]+'">'+r.no+'</span></td><td>'+esc(r.name)+'</td><td class="r num">'+(r.st===null?'-':'.'+String(Math.min(99,Math.round(r.st*100))).padStart(2,'0'))+'</td></tr>';});
     h+='</table></div>';}
-  if(NET.role&&netOpen())return h+'<button class="btn red" data-a="title">部屋にもどる（もう一度対戦）</button>';
+  if(NET.linked)return h+'<button class="btn red" data-a="title">部屋にもどる（もう一度対戦）</button>';
   return h+'<button class="btn red" data-a="go">もう一度走る</button><button class="btn ghost" data-a="title">選手・強さを変える</button>';
 }
 function show(html){cancelAnimationFrame(raf);document.body.classList.remove('racing');app.innerHTML=html;}
@@ -463,7 +458,7 @@ function draw(dt){
     [[1,.55],[-1,.55]].forEach(function(sd){var ia=wa*.62,ib=wb*.62;
       poly([[a[0]+Math.sin(a[2])*wa*sd[0],a[1]-Math.cos(a[2])*wa*sd[0],.15],[a[0]+Math.sin(a[2])*ia*sd[0],a[1]-Math.cos(a[2])*ia*sd[0],.15],[b[0]+Math.sin(b[2])*ib*sd[0],b[1]-Math.cos(b[2])*ib*sd[0],.15],[b[0]+Math.sin(b[2])*wb*sd[0],b[1]-Math.cos(b[2])*wb*sd[0],.15]],'rgba(255,255,255,'+al+')');});}}
   G.ai.forEach(function(a){if(a.v<25)return;var pts=[];for(var k=0;k<=6;k++)pts.push(pathPos(a.tot-36-17*k,RR+a.off));wake(pts);});
-  if(G.rp&&!G.rp.gone&&G.rp.trail.length>8&&G.rp.vF>25){var rp2=[];for(i=G.rp.trail.length-7;i>=0;i-=3)rp2.push(G.rp.trail[i]);wake(rp2);}
+  G.rps.forEach(function(R){if(!R.gone&&R.trail.length>8&&R.vF>25){var rp2=[];for(var k=R.trail.length-7;k>=0;k-=3)rp2.push(R.trail[k]);wake(rp2);}});
   if(G.trail.length>8&&p.vF>25){var tp=[];for(i=G.trail.length-7;i>=0;i-=3)tp.push(G.trail[i]);wake(tp);}
   /* 手本の印 */
   if(!G.free&&G.stTime===null&&G.t<.6){var gp=pathPos(ghostS(G),RR+(G.my-1)*LS+LS*.5);
@@ -486,8 +481,8 @@ function draw(dt){
     cx.fillStyle='#10212e';cx.beginPath();cx.arc(q[0],q[1],r*.74,0,7);cx.fill();
     var an=G.t>=0?0:Math.PI*1.5+((G.t-T0)/6)*Math.PI*2;cx.strokeStyle='#f5a800';cx.lineWidth=Math.max(1.5,r*.14);cx.beginPath();cx.moveTo(q[0],q[1]);cx.lineTo(q[0]+Math.sin(an)*r*.9,q[1]-Math.cos(an)*r*.9);cx.stroke();}});
   G.ai.forEach(function(a){var v=tc(a.x,a.y,0);if(v[2]>-24&&v[2]<1000)Q.push({d:v[2],f:function(){boat3(a.x,a.y,a.h,a.no,false,a.v,0);}});});
-  if(G.rp&&!G.rp.gone){var rv=tc(G.rp.x,G.rp.y,0);if(rv[2]>-24&&rv[2]<1000)Q.push({d:rv[2],f:function(){boat3(G.rp.x,G.rp.y,G.rp.h,G.rp.no,false,G.rp.vF,G.rp.steer);
-    var hv=tc(G.rp.x,G.rp.y,22);if(hv[2]>6&&hv[2]<600){var hq=pj(hv);cx.font='900 12px sans-serif';cx.textAlign='center';cx.textBaseline='alphabetic';cx.lineWidth=3;cx.strokeStyle='#10212e';cx.strokeText(G.rp.name,hq[0],hq[1]);cx.fillStyle='#f5c518';cx.fillText(G.rp.name,hq[0],hq[1]);}}});}
+  G.rps.forEach(function(R){if(R.gone)return;var rv=tc(R.x,R.y,0);if(rv[2]>-24&&rv[2]<1000)Q.push({d:rv[2],f:function(){boat3(R.x,R.y,R.h,R.no,false,R.vF,R.steer);
+    var hv=tc(R.x,R.y,22);if(hv[2]>6&&hv[2]<600){var hq=pj(hv);cx.font='900 12px sans-serif';cx.textAlign='center';cx.textBaseline='alphabetic';cx.lineWidth=3;cx.strokeStyle='#10212e';cx.strokeText(R.name,hq[0],hq[1]);cx.fillStyle='#f5c518';cx.fillText(R.name,hq[0],hq[1]);}}});});
   Q.push({d:fp?-1e9:tc(p.x,p.y,0)[2],f:function(){boat3(p.x,p.y,p.h,G.my,true,p.vF,p.steer,fp);}});
   Q.sort(function(a,b){return b.d-a.d;});for(i=0;i<Q.length;i++)Q[i].f();
   C.h=CH;cx.restore();
@@ -526,7 +521,7 @@ function audioStop(){if(!AU)return;var t=AU.a.currentTime;AU.eg.gain.setTargetAt
 function beside(){
   /* 選手目線で視界の外にいる近くの艇を、画面の左右の端に知らせる */
   var p=G.p,c=Math.cos(p.h),s=Math.sin(p.h),L=G.ai.map(function(a){return {no:a.no,x:a.x,y:a.y};});
-  if(G.rp&&!G.rp.gone)L.push({no:G.rp.no,x:G.rp.x,y:G.rp.y,f:1});
+  G.rps.forEach(function(r){if(!r.gone)L.push({no:r.no,x:r.x,y:r.y,f:1});});
   L.forEach(function(o){var dx=o.x-p.x,dy=o.y-p.y,f=dx*c+dy*s,r=-dx*s+dy*c,d=Math.sqrt(dx*dx+dy*dy);
     if(d>95||(f>18&&Math.abs(r)<f*.75))return;
     var right=r>0,x=right?W-30:30+56,y=H*.52-clamp(f/95,-1,1)*H*.24,al=clamp(1.25-d/95,.35,1),sz=d<40?30:24;
@@ -545,165 +540,168 @@ function wheel(){
   [-.62,.62].forEach(function(g){var gx=Math.sin(g)*r,gy=-Math.cos(g)*r;cx.fillStyle='#f4f6f7';cx.strokeStyle='#10212e';cx.lineWidth=2;cx.beginPath();cx.ellipse(gx,gy,r*.17,r*.2,g,0,7);cx.fill();cx.stroke();});
   cx.restore();
 }
-/* ---------- 友達とのリアルタイム対戦（PeerJS：ブラウザ同士を直接つなぐ） ---------- */
-var NET={peer:null,conn:null,role:null,code:'',msg:'',info:null,last:0,busy:false,auto:0,autoAt:0,tries:0,copied:''};
-var VERSION='1117-1251',newer='';
+/* ---------- 友達とのリアルタイム対戦（最大6人。中継用データベースを通すのでVPNでも通る） ---------- */
+var MAXP=6;
+var NET={role:null,code:'',me:'',host:'h',j:0,peers:{},msg:'',last:0,busy:false,auto:0,copied:'',linked:false,ready:false,startId:0,first:true,wr:false,es:null};
+var VERSION='1117-1710',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
-var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL。入っていれば、端末同士の直接接続の代わりにこちらを使う（VPNでも通る） */
-function netOpen(){return FB_URL?!!NET.linked:!!(NET.conn&&NET.conn.open);}
+var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL */
+function netOpen(){return !!NET.linked;}
 function fbUrl(k){return FB_URL+'/rooms/'+NET.code+'/'+k+'.json';}
 function fbPut(k,o){return fetch(fbUrl(k),{method:'PUT',body:JSON.stringify(o)});}
-function fbMsg(key,d,initial){
-  if(!d||typeof d!=='object')return;
-  if(key==='hello'){if(!NET.linked){NET.linked=true;NET.busy=false;NET.msg='';nlog('相手とつながった');}netData({k:'hello',name:d.name,course:d.course,ready:d.ready,ver:d.ver});}
-  else if(key==='start'){if(initial||d.id===NET.startId){NET.startId=d.id;return;}NET.startId=d.id;d.k='start';netData(d);}
-  else if(key==='s'&&!initial){d.k='s';netData(d);}
-  else if(key==='soon'&&!initial){d.k='soon';netData(d);}
+function helloBody(){return {name:myName(),course:cfg.course,ready:NET.ready?1:0,ver:VERSION,j:NET.role==='host'?0:NET.j,n:Date.now()};}
+function sendHello(){if(NET.linked)fbPut('p/'+NET.me+'/hello',helloBody()).catch(function(){});}
+function racingNow(){return document.body.classList.contains('racing');}
+function peerList(){var L=[];for(var id in NET.peers)L.push(NET.peers[id]);L.sort(function(a,b){return a.j-b.j;});return L;}
+function members(){return [{id:NET.me,name:myName(),course:cfg.course,ready:NET.ready,j:NET.role==='host'?0:NET.j,me:true}].concat(peerList()).sort(function(a,b){return a.j-b.j;});}
+function allReady(){var M=members();return M.length>=2&&M.every(function(m){return m.ready;});}
+function onHello(id,d){
+  if(id===NET.me||!d||typeof d!=='object')return;
+  var was=NET.peers[id],P=was||{id:id};
+  P.name=String(d.name||'友達').slice(0,10);P.course=Number(d.course)||0;P.ready=!!d.ready;P.ver=d.ver?String(d.ver).slice(0,12):'';P.j=id===NET.host?0:(Number(d.j)||1);P.at=performance.now();
+  NET.peers[id]=P;if(P.ver&&P.ver!==VERSION)checkVersion();
+  if(!was)nlog(P.name+' が部屋に入った');
 }
-function fbListen(side){
+function onLeave(id){var P=NET.peers[id];if(!P)return;delete NET.peers[id];nlog(P.name+' が部屋を出た');
+  if(G&&!G.over&&G.rps)G.rps.forEach(function(r){if(r.id===id&&!r.gone){r.gone=true;r.left=true;say(G,r.name+' が退出');}});
+  if(id===NET.host&&NET.role==='guest'){netClose('部屋を作った人が部屋を閉じた。');return;}
+  netReadyCheck();refreshTitle();}
+function onState(id,d){
+  var P=NET.peers[id];if(P)P.at=performance.now();
+  if(!G||G.over||!G.rps)return;var r=null;G.rps.forEach(function(x){if(x.id===id)r=x;});if(!r||r.left)return;
+  var q=d&&d.p;if(!Array.isArray(q))return;
+  if(q[9]){r.gone=true;r.left=true;say(G,r.name+' が棄権');return;}
+  r.n={x:+q[0],y:+q[1],h:+q[2],v:+q[3],tot:+q[4],steer:+q[5],at:performance.now()};
+  if(q[6]!==null&&q[6]!==undefined&&+q[6]>-5&&r.st===null)r.st=+q[6];
+  if(q[7]!==null&&q[7]!==undefined&&+q[7]>-5&&r.fin===null)r.fin=+q[7];
+  r.flying=!!q[8];
+  if(NET.role==='guest'&&id===NET.host){
+    if(typeof d.t==='number'&&Math.abs(G.t-(d.t+.05))>.12&&!G.finished)G.t=d.t+.05;
+    if(Array.isArray(d.a))d.a.forEach(function(x,i){var a=G.ai[i];if(!a||!Array.isArray(x))return;a.tot+=(+x[0]-a.tot)*.5;a.off=+x[1];a.v=+x[2];if(x[3]!==null&&x[3]!==undefined&&+x[3]>-5)a.fin=+x[3];});
+  }
+}
+function onStart(d){
+  if(!d||!d.id||d.id===NET.startId)return;NET.startId=d.id;
+  if(NET.role!=='guest')return;
+  var as=d.as||{},my=Number(as[NET.me])||0;
+  if(!my){NET.msg='ほかの人たちがレース中。終わったら次のレースに一緒に入れる。';refreshTitle();return;}
+  if(G&&!G.over){G.over=true;cancelAnimationFrame(raf);}
+  NET.msg='';cfg.free=false;if(AU)AU.sec=99;
+  var rps=[];for(var id in as)if(id!==NET.me)rps.push({id:id,no:Number(as[id])||1,name:String((d.nm&&d.nm[id])||'友達').slice(0,10)});
+  start({my:my,rps:rps,aiDefs:Array.isArray(d.ai)?d.ai:[]});
+}
+function fbRoom(d,initial){
+  if(!d||typeof d!=='object'||!d.meta){if(NET.linked)netClose('部屋が閉じられた。');return;}
+  var ps=d.p||{},id;
+  for(id in NET.peers)if(!ps[id])onLeave(id);
+  if(!NET.linked)return;
+  for(id in ps)if(ps[id]&&ps[id].hello)onHello(id,ps[id].hello);
+  if(!ps[NET.me])sendHello();
+  if(d.start&&d.start.id)NET.startId=d.start.id;
+  netReadyCheck();refreshTitle();
+}
+function fbEvent(m){
+  var parts=m.path.split('/').filter(Boolean),d=m.data;
+  if(!parts.length){var f=NET.first;NET.first=false;fbRoom(d,f);return;}
+  if(parts[0]==='p'&&parts[1]){var id=parts[1];
+    if(parts.length===2){
+      if(d===null){if(id===NET.me){if(NET.linked&&!racingNow())sendHello();}else onLeave(id);return;}
+      if(d.hello){onHello(id,d.hello);netReadyCheck();refreshTitle();}
+      if(d.s)onState(id,d.s);return;}
+    if(parts[2]==='hello'&&d){onHello(id,d);netReadyCheck();refreshTitle();}
+    else if(parts[2]==='s'&&d)onState(id,d);
+    return;}
+  if(parts[0]==='start'&&d)onStart(d);
+  else if(parts[0]==='soon'&&d&&NET.role==='guest'){NET.auto=1;refreshTitle();}
+}
+function fbListen(){
   try{if(NET.es)NET.es.close();}catch(e){}
-  var first=true,es=new EventSource(FB_URL+'/rooms/'+NET.code+'/'+side+'.json');NET.es=es;
-  es.addEventListener('put',function(ev){var m;try{m=JSON.parse(ev.data);}catch(e){return;}if(!m)return;
-    if(m.path==='/'){var d=m.data;if(d&&typeof d==='object'){if(!first)fbMsg('soon',d.soon,false);fbMsg('hello',d.hello,first);fbMsg('start',d.start,first);fbMsg('s',d.s,first);}first=false;return;}
-    var parts=m.path.split('/');if(parts.length===2)fbMsg(parts[1],m.data,false);});
+  NET.first=true;var es=new EventSource(FB_URL+'/rooms/'+NET.code+'.json');NET.es=es;
+  es.addEventListener('put',function(ev){if(NET.es!==es)return;var m;try{m=JSON.parse(ev.data);}catch(e){return;}if(m&&typeof m.path==='string')fbEvent(m);});
+  es.addEventListener('patch',function(ev){if(NET.es!==es)return;var m;try{m=JSON.parse(ev.data);}catch(e){return;}if(!m||!m.data||typeof m.path!=='string')return;var b=m.path==='/'?'':m.path;for(var k in m.data)fbEvent({path:b+'/'+k,data:m.data[k]});});
   es.onopen=function(){nlog('受信の準備ができた');};
   es.onerror=function(){nlog('受信が途切れた（自動でつなぎ直す）');};
 }
-function fbHost(){
-  NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';NET.linked=false;NET.startId=0;NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();nlog('部屋を作る '+NET.code);
-  fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'PUT',body:JSON.stringify({meta:{at:Date.now()},h:{hello:{name:myName(),course:cfg.course,ready:0,ver:VERSION,n:Date.now()}}})})
-  .then(function(r){if(!r.ok)throw new Error(r.status);nlog('部屋ができた');NET.busy=false;NET.msg='';fbListen('g');refreshTitle();})
-  .catch(function(e){nlog('部屋を作れなかった '+(e&&e.message||''));netClose('部屋を作れなかった。通信の状態を確かめてほしい。');});
-}
-function fbJoin(code){
-  NET.code=code;NET.role='guest';NET.linked=false;NET.startId=0;NET.busy=true;NET.msg='部屋に入っている…';refreshTitle();nlog('部屋を探す '+code);
-  fetch(FB_URL+'/rooms/'+code+'/meta.json').then(function(r){return r.json();}).then(function(m){
-    if(!m){netClose('その番号の部屋が見つからなかった。');return;}
-    nlog('部屋が見つかった');fbListen('h');return fbPut('g/hello',{name:myName(),course:cfg.course,ready:0,ver:VERSION,n:Date.now()});
-  }).catch(function(e){nlog('入室に失敗 '+(e&&e.message||''));netClose('部屋に入れなかった。通信の状態を確かめてほしい。');});
-}
-var NLOG=[],NT0=Date.now();
-var ICE={config:{iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:stun.cloudflare.com:3478'},{urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
-function nlog(m){NLOG.push(((Date.now()-NT0)/1000).toFixed(1)+'秒 '+m);if(NLOG.length>14)NLOG.shift();var el=document.getElementById('nlog');if(el)el.textContent=NLOG.join('\n');}
-function inviteUrl(){return location.origin+location.pathname+'?room='+NET.code;}
-function myName(){return cfg.stats?cfg.stats.name:PRE[cfg.pre].name;}
-function netLib(cb){
-  if(window.Peer){cb();return;}
-  nlog('通信の部品を読み込み中');
-  var sc=document.createElement('script');sc.src='https://unpkg.com/peerjs@1.5.3/dist/peerjs.min.js';
-  sc.onload=function(){nlog('部品の読み込み 完了');cb();};sc.onerror=function(){nlog('部品の読み込み 失敗');NET.busy=false;NET.role=null;NET.msg='通信の部品を読み込めなかった。通信の状態を確かめてほしい。';refreshTitle();};document.head.appendChild(sc);
-}
-function refreshTitle(){if(!document.body.classList.contains('racing')&&document.getElementById('netbox'))show(vTitle());}
-function netClose(m){try{if(NET.es)NET.es.close();}catch(e){}NET.es=null;
-  if(FB_URL&&NET.role==='host'&&NET.code){try{fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'DELETE',keepalive:true}).catch(function(){});}catch(e){}}
-  NET.linked=false;NET.wr=false;NET.ready=false;
-  try{if(NET.conn)NET.conn.close();}catch(e){}try{if(NET.peer)NET.peer.destroy();}catch(e){}
-  clearTimeout(NET.auto);NET.auto=0;NET.copied='';NET.peer=null;NET.conn=null;NET.role=null;NET.info=null;NET.busy=false;NET.msg=m||'';if(G&&G.rp&&!G.over){G.rp.gone=true;say(G,'相手が切断');}refreshTitle();}
-function netWire(conn){
-  NET.conn=conn;nlog('相手との接続を開始');
-  var watch=function(){try{var pc=conn.peerConnection;if(pc&&!pc._tk){pc._tk=1;nlog('経路の状態 '+pc.iceConnectionState);pc.addEventListener('iceconnectionstatechange',function(){nlog('経路の状態 '+pc.iceConnectionState);});
-    pc.addEventListener('icecandidate',function(ev){if(ev.candidate&&ev.candidate.type){pc._ty=pc._ty||{};if(!pc._ty[ev.candidate.type]){pc._ty[ev.candidate.type]=1;nlog('経路の候補 '+ev.candidate.type);}}});
-    pc.addEventListener('icecandidateerror',function(ev){if(!pc._ce){pc._ce=1;nlog('経路の候補でエラー '+(ev.errorCode||''));}});}}catch(e){}};
-  watch();setTimeout(watch,400);setTimeout(watch,1500);
-  conn.on('open',function(){nlog('相手とつながった');NET.busy=false;NET.msg='';netSend(helloMsg());refreshTitle();});
-  conn.on('data',netData);
-  conn.on('close',function(){nlog('接続が閉じた');if(NET.conn===conn&&conn._wasOpen)netClose('相手との接続が切れた。');});
-  conn.on('error',function(e){nlog('接続エラー '+(e&&(e.type||e.message)||''));if(NET.conn===conn&&conn._wasOpen)netClose('通信でエラーが起きた。');});
-  conn.on('open',function(){conn._wasOpen=true;});
-}
-function netSend(o){
-  if(FB_URL){if(!NET.role)return;var side=NET.role==='host'?'h':'g',k=o.k,b={};for(var x in o)if(x!=='k')b[x]=o[x];
-    if(k==='s'){if(NET.wr)return;NET.wr=true;var done=function(){NET.wr=false;};fbPut(side+'/s',b).then(done,done);}
-    else{if(k==='hello')b.n=Date.now();fbPut(side+'/'+k,b).catch(function(){});}
-    return;}
-  try{if(NET.conn&&NET.conn.open)NET.conn.send(o);}catch(e){}
-}
 function netHost(){
-  if(FB_URL){fbHost();return;}
-  NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();
-  netLib(function(){
-    NET.code=String(Math.floor(1000+Math.random()*9000));NET.role='host';
-    try{NET.peer=new Peer('teikon-race-'+NET.code,ICE);}catch(e){netClose('部屋を作れなかった。');return;}
-    NET.peer.on('open',function(id){nlog('中継サーバーに接続 '+id);NET.busy=false;NET.msg='';refreshTitle();});
-    NET.peer.on('disconnected',function(){nlog('中継サーバーから切断');var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
-    NET.peer.on('connection',function(c){nlog('相手から接続の申し込み');if(NET.conn&&NET.conn.open){try{c.close();}catch(e){}return;}netWire(c);});
-    NET.peer.on('error',function(e){var t=e&&e.type;nlog('エラー '+t);if(NET.conn&&NET.conn.open)return;if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error'){return;}
-      netClose(t==='unavailable-id'?'部屋番号が重なった。もう一度「部屋を作る」を押してほしい。':'部屋を作れなかった。時間をおいて試してほしい。');});
-  });
+  NET.role='host';NET.me='h';NET.host='h';NET.j=0;NET.peers={};NET.linked=false;NET.startId=0;NET.ready=false;NET.busy=true;NET.msg='部屋を作っている…';refreshTitle();
+  var tries=0;
+  function attempt(){
+    tries++;NET.code=String(Math.floor(1000+Math.random()*9000));nlog('部屋を作る '+NET.code);
+    fetch(fbUrl('meta')).then(function(r){return r.json();}).then(function(m){
+      if(m&&tries<6){attempt();return;}
+      return fetch(FB_URL+'/rooms/'+NET.code+'.json',{method:'PUT',body:JSON.stringify({meta:{at:Date.now(),v:2},p:{h:{hello:helloBody()}}})})
+      .then(function(r){if(!r.ok)throw new Error(r.status);if(NET.role!=='host')return;nlog('部屋ができた');NET.linked=true;NET.busy=false;NET.msg='';fbListen();refreshTitle();});
+    }).catch(function(e){nlog('部屋を作れなかった '+(e&&e.message||''));netClose('部屋を作れなかった。通信の状態を確かめてほしい。');});
+  }
+  attempt();
 }
 function netJoin(code){
   code=String(code||'').replace(/\D/g,'');if(code.length!==4){NET.msg='部屋番号は4けたの数字。';refreshTitle();return;}
-  if(FB_URL){fbJoin(code);return;}
-  NET.busy=true;NET.msg='部屋に入っている…';NET.code=code;refreshTitle();
-  netLib(function(){
-    NET.role='guest';
-    try{NET.peer=new Peer(undefined,ICE);}catch(e){netClose('接続できなかった。');return;}
-    NET.tries=0;
-    function attempt(){
-      if(NET.role!=='guest'||!NET.peer||(NET.conn&&NET.conn.open))return;
-      NET.tries++;NET.msg='部屋に入っている…（'+NET.tries+'回目）';nlog('入室を試す '+NET.tries+'回目');refreshTitle();
-      try{if(NET.conn){var old=NET.conn;NET.conn=null;old.close();}}catch(e){}
-      try{netWire(NET.peer.connect('teikon-race-'+code,{reliable:true,serialization:'json'}));}catch(e){}
-      setTimeout(function(){
-        if(NET.role!=='guest'||(NET.conn&&NET.conn.open))return;
-        if(NET.tries<3)attempt();else netClose('部屋に入れなかった。番号が合っているか、相手が部屋の画面を開いたままか確かめてほしい。2人ともスマホの回線だとつながりにくいので、どちらかをWi-Fiにすると入れることがある。VPNを使っている場合は、切ると入れることがある。');
-      },20000);
-    }
-    NET.peer.on('open',function(id){nlog('中継サーバーに接続 '+id);attempt();});
-    NET.peer.on('disconnected',function(){nlog('中継サーバーから切断');var pr=NET.peer;setTimeout(function(){try{if(NET.peer===pr&&pr&&!pr.destroyed)pr.reconnect();}catch(e){}},600);});
-    NET.peer.on('error',function(e){var t=e&&e.type;nlog('エラー '+t);if(NET.conn&&NET.conn.open)return;
-      if(t==='peer-unavailable'){if(NET.tries>=3)netClose('その番号の部屋が見つからなかった。相手が部屋の画面を開いたままか確かめてほしい。');return;}
-      if(t==='network'||t==='disconnected'||t==='socket-closed'||t==='socket-error'||t==='server-error')return;
-      netClose('接続できなかった。時間をおいて試してほしい。');});
-  });
+  NET.code=code;NET.role='guest';NET.host='h';NET.me='g'+Math.random().toString(36).slice(2,8);NET.j=Date.now();NET.peers={};NET.linked=false;NET.startId=0;NET.ready=false;NET.busy=true;NET.msg='部屋に入っている…';refreshTitle();nlog('部屋を探す '+code);
+  fetch(FB_URL+'/rooms/'+code+'.json').then(function(r){return r.json();}).then(function(d){
+    if(NET.role!=='guest')return;
+    if(!d||!d.meta){netClose('その番号の部屋が見つからなかった。');return;}
+    if(!d.meta.v){netClose('部屋を作った人のページが古い版。相手に「最新版に更新する」を押して、部屋を作り直してもらってほしい。');return;}
+    if(Object.keys(d.p||{}).length>=MAXP){netClose('その部屋は満員（'+MAXP+'人）。');return;}
+    nlog('部屋が見つかった');
+    return fbPut('p/'+NET.me,{hello:helloBody()}).then(function(r){if(!r.ok)throw new Error(r.status);if(NET.role!=='guest')return;nlog('部屋に入った');NET.linked=true;NET.busy=false;NET.msg='';fbListen();refreshTitle();});
+  }).catch(function(e){nlog('入室に失敗 '+(e&&e.message||''));netClose('部屋に入れなかった。通信の状態を確かめてほしい。');});
 }
+var NLOG=[],NT0=Date.now();
+function nlog(m){NLOG.push(((Date.now()-NT0)/1000).toFixed(1)+'秒 '+m);if(NLOG.length>14)NLOG.shift();var el=document.getElementById('nlog');if(el)el.textContent=NLOG.join('\n');}
+function inviteUrl(){return location.origin+location.pathname+'?room='+NET.code;}
+function myName(){return cfg.stats?cfg.stats.name:PRE[cfg.pre].name;}
+function refreshTitle(){if(!racingNow()&&document.getElementById('netbox'))show(vTitle());}
+function netClose(m){
+  var es=NET.es;NET.es=null;try{if(es)es.close();}catch(e){}
+  if(NET.code&&NET.linked){var u=NET.role==='host'?FB_URL+'/rooms/'+NET.code+'.json':fbUrl('p/'+NET.me);try{fetch(u,{method:'DELETE',keepalive:true}).catch(function(){});}catch(e){}}
+  NET.linked=false;NET.wr=false;NET.ready=false;NET.peers={};clearTimeout(NET.auto);NET.auto=0;NET.copied='';NET.role=null;NET.busy=false;NET.msg=m||'';
+  if(G&&G.rps&&!G.over){var any=false;G.rps.forEach(function(r){if(!r.gone){r.gone=true;any=true;}});if(any)say(G,'通信が切れた');}
+  refreshTitle();}
 function netReadyCheck(){
-  var racing=document.body.classList.contains('racing'),both=NET.ready&&NET.info&&NET.info.ready&&netOpen();
-  if(NET.role!=='host'){if(!both)NET.auto=0;return;}
-  if(both&&!racing&&!NET.auto){netSend({k:'soon',id:Date.now()});NET.auto=setTimeout(function(){NET.auto=0;if(NET.ready&&NET.info&&NET.info.ready&&!document.body.classList.contains('racing'))netStart();else refreshTitle();},2500);}
-  else if(!both&&NET.auto){clearTimeout(NET.auto);NET.auto=0;}
+  var ok=NET.linked&&allReady();
+  if(NET.role!=='host'){if(!ok)NET.auto=0;return;}
+  if(ok&&!racingNow()&&!NET.auto){fbPut('soon',{id:Date.now()}).catch(function(){});NET.auto=setTimeout(function(){NET.auto=0;if(NET.linked&&allReady()&&!racingNow())netStart();else refreshTitle();},2500);}
+  else if(!ok&&NET.auto){clearTimeout(NET.auto);NET.auto=0;}
 }
 function netStart(){
-  if(NET.role!=='host'||!NET.info)return;
+  if(NET.role!=='host')return;
   clearTimeout(NET.auto);NET.auto=0;
-  var hc=cfg.course||Math.floor(rnd(1,7)),gc=NET.info.course;
-  if(!gc||gc===hc){do{gc=Math.floor(rnd(1,7));}while(gc===hc);}
+  /* 先に部屋に入った人から、選んだコースを優先。重なった人と「おまかせ」の人は空いているコースに入る */
+  var M=members().slice(0,MAXP),used={},as={},nm={};
+  M.forEach(function(m){nm[m.id]=m.name;if(m.course&&!used[m.course]){used[m.course]=1;as[m.id]=m.course;}});
+  M.forEach(function(m){if(as[m.id])return;var fr=[];for(var c=1;c<=6;c++)if(!used[c])fr.push(c);var c2=fr[Math.floor(Math.random()*fr.length)];used[c2]=1;as[m.id]=c2;});
   cfg.free=false;audioInit();if(AU)AU.sec=99;
-  start({my:hc,rpNo:gc});
-  netSend({k:'start',id:Date.now(),you:gc,host:hc,ai:G.ai.map(function(a){return {no:a.no,name:a.name,st:a.st};})});
-}
-function netData(d){
-  if(!d||typeof d!=='object')return;
-  if(d.k==='hello'){var first=!NET.info;NET.info={name:String(d.name||'友達').slice(0,10),course:Number(d.course)||0,ready:!!d.ready,ver:d.ver?String(d.ver).slice(0,12):''};if(d.ver&&d.ver!==VERSION)checkVersion();
-    if(first)netSend(helloMsg());
-    netReadyCheck();refreshTitle();}
-  else if(d.k==='soon'&&NET.role==='guest'){NET.auto=1;refreshTitle();}
-  else if(d.k==='start'&&NET.role==='guest'){cfg.free=false;if(AU)AU.sec=99;start({my:Number(d.you)||1,rpNo:Number(d.host)||2,aiDefs:Array.isArray(d.ai)?d.ai:[]});}
-  else if(d.k==='s'&&G&&G.rp&&!G.over){
-    var r=G.rp,q=d.p;if(!Array.isArray(q))return;
-    r.n={x:+q[0],y:+q[1],h:+q[2],v:+q[3],tot:+q[4],steer:+q[5],at:performance.now()};
-    if(q[6]!==null&&q[6]!==undefined&&+q[6]>-5&&r.st===null)r.st=+q[6];
-    if(q[7]!==null&&q[7]!==undefined&&+q[7]>-5&&r.fin===null)r.fin=+q[7];
-    r.flying=!!q[8];
-    if(NET.role==='guest'){
-      if(typeof d.t==='number'&&Math.abs(G.t-(d.t+.05))>.12&&!G.finished)G.t=d.t+.05;
-      if(Array.isArray(d.a))d.a.forEach(function(x,i){var a=G.ai[i];if(!a||!Array.isArray(x))return;a.tot+=(+x[0]-a.tot)*.5;a.off=+x[1];a.v=+x[2];if(x[3]!==null&&x[3]!==undefined&&+x[3]>-5&&a.fin===null)a.fin=+x[3];});
-    }
-  }
+  start({my:as[NET.me],rps:M.filter(function(m){return !m.me;}).map(function(m){return {id:m.id,no:as[m.id],name:m.name};})});
+  var id=Date.now();NET.startId=id;
+  fbPut('start',{id:id,as:as,nm:nm,ai:G.ai.map(function(a){return {no:a.no,name:a.name,st:a.st};})}).catch(function(){});
 }
 function netTick(now){
-  if(!G||!G.rp)return;var r=G.rp,p=G.p;
-  if(r.n&&!r.gone&&now-r.n.at>7000){r.gone=true;say(G,'相手との通信が途切れた');}
-  if(r.n&&r.gone&&now-r.n.at<1000)r.gone=false;
-  if(r.n&&!r.gone){var age=Math.min(.25,(now-r.n.at)/1000),tx=r.n.x+Math.cos(r.n.h)*r.n.v*age,ty=r.n.y+Math.sin(r.n.h)*r.n.v*age;
-    r.x+=(tx-r.x)*.35;r.y+=(ty-r.y)*.35;var dh=r.n.h-r.h;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;r.h+=dh*.35;
-    r.vF=r.n.v;r.tot=r.n.tot+r.n.v*age;r.steer=r.n.steer;r.trail.push([r.x,r.y,r.h]);if(r.trail.length>66)r.trail.shift();}
-  if(now-NET.last>(FB_URL?80:50)){NET.last=now;
-    var m={k:'s',p:[Math.round(p.x*10)/10,Math.round(p.y*10)/10,Math.round(p.h*1000)/1000,Math.round(p.vF),Math.round(p.tot*10)/10,Math.round((p.steer||0)*100)/100,G.stTime===null?-9:Math.round(G.stTime*1000)/1000,G.finTime===null?-9:Math.round(G.finTime*1000)/1000,G.flying?1:0]};
+  if(!G||!G.rps||!G.rps.length||!NET.linked)return;var p=G.p;
+  G.rps.forEach(function(r){
+    if(r.left)return;
+    if(r.n&&!r.gone&&now-r.n.at>7000){r.gone=true;say(G,r.name+' との通信が途切れた');}
+    if(r.n&&r.gone&&now-r.n.at<1000)r.gone=false;
+    if(r.n&&!r.gone){var age=Math.min(.25,(now-r.n.at)/1000),tx=r.n.x+Math.cos(r.n.h)*r.n.v*age,ty=r.n.y+Math.sin(r.n.h)*r.n.v*age;
+      r.x+=(tx-r.x)*.35;r.y+=(ty-r.y)*.35;var dh=r.n.h-r.h;while(dh>Math.PI)dh-=2*Math.PI;while(dh<-Math.PI)dh+=2*Math.PI;r.h+=dh*.35;
+      r.vF=r.n.v;r.tot=r.n.tot+r.n.v*age;r.steer=r.n.steer;r.trail.push([r.x,r.y,r.h]);if(r.trail.length>66)r.trail.shift();}
+  });
+  if(now-NET.last>(G.rps.length>2?100:80)){NET.last=now;
+    var m={p:[Math.round(p.x*10)/10,Math.round(p.y*10)/10,Math.round(p.h*1000)/1000,Math.round(p.vF),Math.round(p.tot*10)/10,Math.round((p.steer||0)*100)/100,G.stTime===null?-9:Math.round(G.stTime*1000)/1000,G.finTime===null?-9:Math.round(G.finTime*1000)/1000,G.flying?1:0,0]};
     if(NET.role==='host'){m.t=Math.round(G.t*1000)/1000;m.a=G.ai.map(function(a){return [Math.round(a.tot*10)/10,Math.round(a.off*10)/10,Math.round(a.v),a.fin===null?-9:Math.round(a.fin*1000)/1000];});}
-    netSend(m);}
+    netSendS(m);}
 }
+function netSendS(b){if(!NET.linked||NET.wr)return;NET.wr=true;var done=function(){NET.wr=false;};fbPut('p/'+NET.me+'/s',b).then(done,done);}
+/* レースを途中でやめたことを他の人に知らせる */
+function netQuitRace(){if(!NET.linked||!G||!G.rps||!G.rps.length)return;fbPut('p/'+NET.me+'/s',{p:[0,0,0,0,0,0,-9,-9,0,1]}).catch(function(){});}
+/* 部屋にいる間は時々「まだいる」と知らせ、部屋を作った人は長く応答のない人を部屋から外す */
+setInterval(function(){
+  if(!NET.linked)return;
+  if(!racingNow())sendHello();
+  if(NET.role==='host'){var now=performance.now();for(var id in NET.peers){var P=NET.peers[id];if(P.at&&now-P.at>50000){nlog(P.name+' の応答がない');fetch(fbUrl('p/'+id),{method:'DELETE'}).catch(function(){});onLeave(id);}}}
+},15000);
+window.addEventListener('pagehide',function(){if(NET.linked)netClose('');});
 /* ---------- 本格3D（WebGL）。使えない端末では、これまでの描き方に自動で戻る ---------- */
 var GLR=null,glcv=null;
 var SUN=(function(){var v=[-.42,.5,.76],l=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);return [v[0]/l,v[1]/l,v[2]/l];})();
@@ -864,7 +862,7 @@ function renderGL(hh,fp){
   function boat(x,y,h,no,lean,rider){var c=Math.cos(h),s=Math.sin(h),m=new Float32Array([c,s,0,0,-s,c,lean*.11,0,0,0,1,0,x,y,0,1]);gl.uniformMatrix4fv(M.uM,false,m);
     bindMesh(R.hull[no-1].b);gl.drawArrays(gl.TRIANGLES,0,R.hull[no-1].n);if(rider){bindMesh(R.rider[no-1].b);gl.drawArrays(gl.TRIANGLES,0,R.rider[no-1].n);}}
   G.ai.forEach(function(a){boat(a.x,a.y,a.h,a.no,0,true);});
-  if(G.rp&&!G.rp.gone)boat(G.rp.x,G.rp.y,G.rp.h,G.rp.no,(G.rp.steer||0)*1.6,true);
+  G.rps.forEach(function(r){if(!r.gone)boat(r.x,r.y,r.h,r.no,(r.steer||0)*1.6,true);});
   boat(p.x,p.y,p.h,G.my,(p.steer||0)*1.6,!fp);
   /* 水面 */
   var Wt=R.water;gl.useProgram(Wt.p);gl.bindBuffer(gl.ARRAY_BUFFER,R.wat);gl.enableVertexAttribArray(Wt.aP);gl.vertexAttribPointer(Wt.aP,3,gl.FLOAT,false,12,0);
@@ -879,7 +877,7 @@ function renderGL(hh,fp){
     [1,-1].forEach(function(sd){var ia=wa*.5,ib=wb*.5;
       q4([a[0]+Math.sin(a[2])*wa*sd,a[1]-Math.cos(a[2])*wa*sd,.22],[a[0]+Math.sin(a[2])*ia*sd,a[1]-Math.cos(a[2])*ia*sd,.22],[b[0]+Math.sin(b[2])*ib*sd,b[1]-Math.cos(b[2])*ib*sd,.22],[b[0]+Math.sin(b[2])*wb*sd,b[1]-Math.cos(b[2])*wb*sd,.22],WH,al,Math.max(0,bl));});}}
   G.ai.forEach(function(a){if(a.v<25)return;var pts=[];for(var k=0;k<=7;k++)pts.push(pathPos(a.tot-30-17*k,RR+a.off));wakeStrip(pts);});
-  if(G.rp&&!G.rp.gone&&G.rp.trail.length>8&&G.rp.vF>25){var rp2=[];for(i=G.rp.trail.length-8;i>=0;i-=7)rp2.push(G.rp.trail[i]);wakeStrip(rp2);}
+  G.rps.forEach(function(r){if(!r.gone&&r.trail.length>8&&r.vF>25){var rp2=[];for(var k=r.trail.length-8;k>=0;k-=7)rp2.push(r.trail[k]);wakeStrip(rp2);}});
   if(G.trail.length>8&&p.vF>25){var tp=[];for(i=G.trail.length-8;i>=0;i-=7)tp.push(G.trail[i]);wakeStrip(tp);}
   function fx(x,y,h,sp0,steer,mine){var c=Math.cos(h),s=Math.sin(h),k=clamp(sp0/170,0,1);function Pt(a,b,z){return [x+a*c-b*s,y+a*s+b*c,z];}
     q4(Pt(17,-5,.12),Pt(17,5,.12),Pt(-13,7.5,.12),Pt(-13,-7.5,.12),[.02,.16,.22],.3);
@@ -891,7 +889,7 @@ function renderGL(hh,fp){
     if(mine&&fp){[1,-1].forEach(function(e2){q4(Pt(13,e2*2,.4),Pt(3,e2*6.4,.4),Pt(-4,e2*(9+k*9),2+k*7),Pt(8,e2*(6+k*5),1.5+k*4),WH,.3+k*.35,0);});}
     if(Math.abs(steer||0)>.25){var sd=steer>0?-1:1;q4(Pt(4,sd*6,.3),Pt(-9,sd*6,.3),Pt(-12,sd*(12+k*8),5+k*9),Pt(0,sd*(11+k*6),3+k*6),WH,.75,.05);}}
   G.ai.forEach(function(a){fx(a.x,a.y,a.h,a.v,0,false);});
-  if(G.rp&&!G.rp.gone)fx(G.rp.x,G.rp.y,G.rp.h,G.rp.vF,G.rp.steer,false);
+  G.rps.forEach(function(r){if(!r.gone)fx(r.x,r.y,r.h,r.vF,r.steer,false);});
   fx(p.x,p.y,p.h,p.vF,p.steer,true);
   if(!G.free&&G.stTime===null&&G.t<.6){var gp=pathPos(ghostS(G),RR+(G.my-1)*LS+LS*.5),Y=[.96,.77,.09];
     q4([gp[0]+13,gp[1],.5],[gp[0]-6,gp[1]-8,.5],[gp[0]-2,gp[1],.5],[gp[0]-6,gp[1]+8,.5],Y,1);
@@ -911,7 +909,7 @@ function tags3(){
     if(name){cx.font='900 12px sans-serif';cx.textBaseline='alphabetic';cx.lineWidth=3;cx.strokeStyle='#10212e';cx.strokeText(name,q[0],q[1]-sz*.62-5);cx.fillStyle='#f5c518';cx.fillText(name,q[0],q[1]-sz*.62-5);}
     cx.textBaseline='alphabetic';}
   G.ai.forEach(function(a){tag(a.no,a.x,a.y,'');});
-  if(G.rp&&!G.rp.gone)tag(G.rp.no,G.rp.x,G.rp.y,G.rp.name);
+  G.rps.forEach(function(r){if(!r.gone)tag(r.no,r.x,r.y,r.name);});
 }
 
 function fpOverlay(fp){
@@ -920,7 +918,7 @@ function fpOverlay(fp){
 }
 function panel(x,y,w,h){cx.fillStyle='rgba(16,33,46,.84)';cx.fillRect(x,y,w,h);}
 function hud(){
-  var p=G.p,lap=clamp(Math.floor(Math.max(0,p.tot)/LAP)+1,1,LAPS),pos=1+G.ai.filter(function(a){return a.tot>p.tot;}).length+(G.rp&&!G.rp.gone&&G.rp.tot>p.tot?1:0);
+  var p=G.p,lap=clamp(Math.floor(Math.max(0,p.tot)/LAP)+1,1,LAPS),pos=1+G.ai.filter(function(a){return a.tot>p.tot;}).length+G.rps.filter(function(r){return !r.gone&&r.tot>p.tot;}).length;
   cx.textBaseline='alphabetic';
   /* 速度・やめる */
   panel(10,10,96,30);cx.fillStyle='#fff';cx.font='900 17px sans-serif';cx.textAlign='left';cx.fillText(Math.round(p.vF*.47)+' km/h',18,31);
@@ -934,7 +932,7 @@ function hud(){
   function mp(x,y){return [mx0+mw/2+x/WX*(mw/2-5),44+27+y/WY*22];}
   cx.strokeStyle='#9aa6ad';cx.beginPath();var m1=mp(-D,0),m2=mp(D,0);cx.moveTo(m1[0],m1[1]);cx.lineTo(m2[0],m2[1]);cx.stroke();
   G.ai.forEach(function(a){var q=mp(a.x,a.y);cx.fillStyle=COL[a.no-1];cx.strokeStyle='#10212e';cx.lineWidth=1;cx.beginPath();cx.arc(q[0],q[1],3.2,0,7);cx.fill();cx.stroke();});
-  if(G.rp&&!G.rp.gone){var rq2=mp(G.rp.x,G.rp.y);cx.fillStyle='#f5c518';cx.strokeStyle='#10212e';cx.lineWidth=1.5;cx.beginPath();cx.arc(rq2[0],rq2[1],4.5,0,7);cx.fill();cx.stroke();}
+  G.rps.forEach(function(r){if(r.gone)return;var rq2=mp(r.x,r.y);cx.fillStyle=COL[r.no-1];cx.strokeStyle='#f5c518';cx.lineWidth=2;cx.beginPath();cx.arc(rq2[0],rq2[1],4.5,0,7);cx.fill();cx.stroke();});
   var qq=mp(p.x,p.y);cx.fillStyle='#e0352b';cx.beginPath();cx.arc(qq[0],qq[1],5,0,7);cx.fill();cx.stroke();
   /* 大時計 または タイム */
   var ny=W<760?46:0;
@@ -975,8 +973,9 @@ function hud(){
       cx.font='900 26px sans-serif';cx.textAlign='center';cx.textBaseline='alphabetic';cx.lineWidth=5;cx.strokeStyle='#10212e';cx.strokeText(G.cut.t,W/2,H*.2);cx.fillStyle='#f5c518';cx.fillText(G.cut.t,W/2,H*.2);
       cx.globalAlpha=1;}
   }
-  var big=G.finished?'':G.msgT>0?G.msg:(G.stTime===null&&G.t>G.launch&&G.t<G.launch+1?'レバーを上げろ！':'');
+  var big=G.finished||G.menu?'':G.msgT>0?G.msg:(G.stTime===null&&G.t>G.launch&&G.t<G.launch+1?'レバーを上げろ！':'');
   if(big){cx.font='900 26px sans-serif';cx.textAlign='center';cx.lineWidth=6;cx.strokeStyle='#fff';cx.strokeText(big,W/2,H*.3);cx.fillStyle=G.msgT>0?'#10212e':'#e0352b';cx.fillText(big,W/2,H*.3);}
+  if(G.menu)drawMenu();
 }
 function rrect(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();}
 function size(){
@@ -988,9 +987,9 @@ function size(){
 }
 function pt(e){return rot?[e.clientY,PW-e.clientX]:[e.clientX,e.clientY];}
 function start(o){
-  o=o||{};if(o.rpNo){NET.ready=false;NET.auto=0;if(NET.info)NET.info.ready=false;}
+  o=o||{};if(o.rps){NET.ready=false;NET.auto=0;for(var pid in NET.peers)NET.peers[pid].ready=false;}
   var cs=curStats(),avg=(cs.st+cs.tn+cs.mt+cs.mn)/4;
-  G=newRace({stats:cs,aiSpeed:164+(avg-45)*.46+LV[cfg.lv].v,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rpNo:o.rpNo,rpName:NET.info?NET.info.name:'友達',aiDefs:o.aiDefs});inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
+  G=newRace({stats:cs,aiSpeed:164+(avg-45)*.46+LV[cfg.lv].v,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rps:o.rps,aiDefs:o.aiDefs});G.menu=false;inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
   show(vRace());document.body.classList.add('racing');cv=document.getElementById('cv');glcv=document.getElementById('gl');
   GLR=/[?&]flat=1/.test(location.search)?null:glInit(glcv);
   if(GLR){cv.style.background='transparent';}else{glcv.style.display='none';glcv=null;}
@@ -1000,12 +999,28 @@ function start(o){
   try{var de=document.documentElement;if(de.requestFullscreen)de.requestFullscreen().then(function(){try{screen.orientation.lock('landscape').catch(function(){});}catch(e){}}).catch(function(){});}catch(e){}
   last=performance.now();raf=requestAnimationFrame(loop);
 }
-function toResult(){G.over=true;cancelAnimationFrame(raf);audioStop();leave();show(vResult());if(netOpen())netSend(helloMsg());}
+function netRace(){return !!(G&&G.rps&&G.rps.length&&NET.linked);}
+function menuBtns(){var w=240,h=46,x=W/2-w/2,L=netRace()?[['cont','続ける'],['quit','レースをやめる（部屋にもどる）']]:[['cont','続ける'],['again','始めからやり直す'],['quit','やめる（最初の画面へ）']],y0=H/2-(L.length*58)/2+14;
+  return L.map(function(b,i){return {k:b[0],t:b[1],x:x,y:y0+i*58,w:w,h:h};});}
+function menuAct(k){
+  if(k==='cont'){G.menu=false;last=performance.now();return;}
+  if(netRace())netQuitRace();
+  G.over=true;cancelAnimationFrame(raf);audioStop();
+  if(k==='again'){if(AU)AU.sec=cfg.free?0:99;start();return;}
+  leave();show(vTitle());sendHello();}
+function drawMenu(){
+  cx.fillStyle='rgba(16,33,46,.55)';cx.fillRect(0,0,W,H);
+  cx.textAlign='center';cx.textBaseline='alphabetic';cx.fillStyle='#fff';cx.font='900 18px sans-serif';
+  var mb=menuBtns();cx.fillText(netRace()?'レース中（ほかの人は走り続けている）':'一時停止中',W/2,mb[0].y-18);
+  mb.forEach(function(B,i){cx.fillStyle=i===0?'#e0352b':'#fff';cx.strokeStyle='#10212e';cx.lineWidth=2;rrect(B.x,B.y,B.w,B.h,8);cx.fill();cx.stroke();
+    cx.fillStyle=i===0?'#fff':'#10212e';cx.font='900 16px sans-serif';cx.fillText(B.t,W/2,B.y+29);});}
+function toResult(){G.over=true;cancelAnimationFrame(raf);audioStop();leave();show(vResult());sendHello();}
 function leave(){try{if(document.fullscreenElement)document.exitFullscreen().catch(function(){});}catch(e){}}
 function setLever(y){inp.lever=clamp((H*.82-y)/(H*.58),0,1);}
 function onKnob(q){var ky=H*.82-H*.58*inp.lever;return Math.abs(q[0]-40)<34&&q[1]>H*.24-30&&q[1]<H*.82+30;}
 function pd(e){e.preventDefault();audioInit();var q=pt(e);
-  if(q[0]>108&&q[0]<174&&q[1]<44){G.over=true;cancelAnimationFrame(raf);audioStop();leave();show(vTitle());return;}
+  if(G.menu){var mb=menuBtns();for(var bi=0;bi<mb.length;bi++){var B=mb[bi];if(q[0]>B.x&&q[0]<B.x+B.w&&q[1]>B.y&&q[1]<B.y+B.h){menuAct(B.k);return;}}return;}
+  if(q[0]>108&&q[0]<174&&q[1]<44){G.menu=true;inp.steer=0;ptr={};lookHold=0;return;}
   try{cv.setPointerCapture(e.pointerId);}catch(x){}
   if(q[0]>176&&q[0]<236&&q[1]<44){sndOn=!sndOn;if(sndOn)audioInit();return;}
   if(q[0]>242&&q[0]<314&&q[1]<44){cfg.view=VORD[(VORD.indexOf(cfg.view)+1)%VORD.length];return;}
@@ -1019,28 +1034,21 @@ function loop(now){
   if(keys.left||keys.right)inp.steer=(keys.right?1:0)-(keys.left?1:0);else if(keys.used&&!Object.keys(ptr).length)inp.steer=0;
   if(keys.used)inp.lever=keys.lever?1:0;
   else if(!Object.keys(ptr).some(function(id){return ptr[id].k==='lev'||ptr[id].k==='levr';}))inp.lever+=(0-inp.lever)*Math.min(1,dt*9);
-  netTick(now);step(G,dt,inp);draw(dt);audioUpdate();
+  netTick(now);var paused=G.menu&&!netRace();if(!paused)step(G,dt,inp);draw(dt);if(paused)audioStop();else audioUpdate();
   if(G.finished&&!G.jing){G.jing=true;G.finAt=G.t;
     if(!G.flying&&G.place===1){beep(784,.14,.14);setTimeout(function(){beep(988,.14,.14);},140);setTimeout(function(){beep(1175,.4,.14);},280);}else beep(G.flying?160:440,.4,.13,G.flying?'square':'sine');}
   raf=requestAnimationFrame(loop);
 }
 var keys={left:false,right:false,lever:false,used:false},lookHold=0;
 function lookRects(){var y=H-64,w=96,h=54;return [[W/2-H*.2-w-22,y,w,h,-1],[W/2+H*.2+22,y,w,h,1]];}
-var hidAt=0;
-document.addEventListener('visibilitychange',function(){
-  if(document.hidden){hidAt=Date.now();return;}
-  if(!NET.peer||NET.peer.destroyed||(NET.conn&&NET.conn.open))return;
-  nlog('画面に戻った');
-  try{if(NET.peer.disconnected)NET.peer.reconnect();else if(NET.role==='host'&&Date.now()-hidAt>1500){nlog('中継サーバーにつなぎ直す');NET.peer.disconnect();}}catch(e){}
-});
 window.addEventListener('resize',function(){if(document.body.classList.contains('racing')){size();if(G)draw(.016);}});
 app.addEventListener('click',function(ev){
   var el=ev.target.closest('[data-a]');if(!el)return;var a=el.getAttribute('data-a'),k=el.getAttribute('data-k'),ce=document.getElementById('code');
   if(ce)cfg.code=ce.value;var rn=document.getElementById('rno');if(rn)cfg.rno=rn.value;
-  if(a==='pre'){cfg.pre=k;cfg.stats=null;cfg.codeMsg='';show(vTitle());if(netOpen())netSend(helloMsg());}
+  if(a==='pre'){cfg.pre=k;cfg.stats=null;cfg.codeMsg='';show(vTitle());sendHello();}
   else if(a==='lv'){cfg.lv=k;show(vTitle());}
   else if(a==='view'){cfg.view=k;show(vTitle());}
-  else if(a==='course'){cfg.course=+k;show(vTitle());if(netOpen())netSend(helloMsg());}
+  else if(a==='course'){cfg.course=+k;show(vTitle());sendHello();}
   else if(a==='tilt'){cfg.tilt=+k;show(vTitle());}
   else if(a==='title2'){show(vTitle());}
   else if(a==='free'){cfg.free=true;audioInit();if(AU)AU.sec=0;start();}
@@ -1052,7 +1060,7 @@ app.addEventListener('click',function(ev){
     if(navigator.share){navigator.share({title:'艇魂 操作レース',text:'艇魂で対戦しよう（部屋番号 '+NET.code+'）',url:u}).catch(function(){});}
     else{try{navigator.clipboard.writeText(u).then(okc,function(){NET.copied='コピーできなかった。下のリンクを長押しでコピーしてほしい。';refreshTitle();});}catch(e){NET.copied='下のリンクを長押しでコピーしてほしい。';refreshTitle();}}}
   else if(a==='netstart')netStart();
-  else if(a==='netready'){NET.ready=!NET.ready;netSend(helloMsg());netReadyCheck();show(vTitle());}
+  else if(a==='netready'){NET.ready=!NET.ready;NET.msg='';sendHello();netReadyCheck();show(vTitle());}
   else if(a==='load'){var d=decode(cfg.code);if(d){cfg.stats=d;cfg.codeMsg=esc(d.name)+' を読み込んだ。';}else{cfg.stats=null;cfg.codeMsg='コードが読み取れなかった。本編の「セーブコード」で出した文字を全部貼り付けてほしい。';}show(vTitle());}
   else if(a==='loadno')loadNo(cfg.rno);
   else if(a==='go'){cfg.free=false;audioInit();if(AU)AU.sec=99;start();}
@@ -1067,6 +1075,7 @@ if(dm){var vm=/view=(\w+)/.exec(location.search);cfg.view=vm?vm[1]:'back';if(/fr
     if(G.stTime===null){ip.lever=G.t>G.launch+.1&&p.tot<ghostS(G)+3?1:0;}
     else{var tg=pathPos(proj(p.x,p.y)+55,RR-8),e=Math.atan2(tg[1]-p.y,tg[0]-p.x)-p.h;while(e>Math.PI)e-=2*Math.PI;while(e<-Math.PI)e+=2*Math.PI;ip.steer=clamp(e*4,-1,1);ip.lever=Math.abs(e)<.5?1:.2;}
     inp.steer=ip.steer;inp.lever=ip.lever;step(G,1/60,ip);draw(1/60);}
+  if(/menu=1/.test(location.search)){G.menu=true;draw(1/60);}
   if(/ptest/.test(location.search)){var out=[];function ev(t,x,y){cv.dispatchEvent(new PointerEvent(t,{pointerId:5,clientX:rot?PW-y:x,clientY:rot?x:y,bubbles:true,cancelable:true}));}
     inp.lever=.2;ev('pointerdown',40,H*.5);out.push(inp.lever.toFixed(2));ev('pointermove',40,H*.3);out.push(inp.lever.toFixed(2));ev('pointerup',40,H*.3);out.push(inp.lever.toFixed(2));
     ev('pointerdown',200,H*.7);ev('pointermove',200,H*.5);out.push(inp.lever.toFixed(2));ev('pointerup',200,H*.5);
