@@ -101,7 +101,7 @@ function newRace(cfg){
   var run0=my<=3?170:330;
   var G={t:free?0:T0,my:my,ai:ai,over:false,finished:false,free:free,lapN:-1,lapStart:0,lastLap:null,bestLap:null,flying:false,late:false,stTime:free?0:null,finTime:null,place:null,msg:'',msgT:0,run:run0,
     p:{x:-run0,y:RR+(my-1)*LS,h:0,vF:0,vL:0,tot:-run0,prev:LAP-run0,
-       vmax:(150+st.mt*.45)*(1+tl*.045),acc:(.8+st.st*.012)*(1-tl*.1),turn:(1.2+st.tn*.012)*(1-tl*.05),grip:(2+st.tn*.025)*(1-tl*.04),wake:.66+st.mn*.0014,bump:.85+st.mn*.001},
+       vmax:(150+st.mt*.45)*(1+tl*.045),acc:(.8+st.st*.012)*(1-tl*.1),turn:(1.2+st.tn*.012)*(1-tl*.05),grip:(2+st.tn*.025)*(1-tl*.04),wake:.66+st.mn*.0014,rmin:cfg.rmin||38,bump:.85+st.mn*.001},
     trail:[]};
   G.pass=[];G.turnT=0;G.exitAt=null;G.wasT=false;G.t1=false;G.cut=null;
   G.remoteAI=!!cfg.aiDefs;
@@ -167,7 +167,8 @@ function step(G,dt,inp){
   var steer=clamp(Number(inp.steer)||0,-1,1);
   /* 速いほど曲がりにくい：握ったままだと大きく回り、落とすと小さく回れる */
   var tf=1-.36*clamp((p.vF-.5*lim)/(.5*lim),0,1);
-  if(Math.abs(steer)>.02){p.h+=steer*p.turn*tf*(1+.45*(1-lev))*dt*clamp(p.vF/60,.25,1);p.vF-=p.vF*(.8-.74*lev)*Math.abs(steer)*dt;}
+  /* 艇が回れる半径には限りがある（マークぎりぎりを小さく回る近道は効きにくい） */
+  if(Math.abs(steer)>.02){p.h+=steer*Math.min(p.turn*tf*(1+.45*(1-lev))*clamp(p.vF/60,.25,1),Math.max(p.vF,25)/p.rmin)*dt;p.vF-=p.vF*(.8-.74*lev)*Math.abs(steer)*dt;}
   /* 向きを変えた分だけ横滑りが残る */
   var c=Math.cos(p.h),s=Math.sin(p.h),vx=p.vx||0,vy=p.vy||0,f=vx*c+vy*s,l=-vx*s+vy*c;
   f+=(p.vF-f)*Math.min(1,dt*6);l*=Math.exp(-p.grip*dt);
@@ -218,7 +219,7 @@ window.TEIKON_RACE={newRace:newRace,step:step,ghostS:ghostS,pathPos:pathPos,proj
 /* ---------- 画面 ---------- */
 var app=document.getElementById('app');if(!app)return;
 var PRE={d:{name:'オールD',v:45},b:{name:'オールB',v:65},s:{name:'オールS',v:85}};
-var LV={e:{name:'やさしい',sub:'好スタートなら勝てる',v:0},n:{name:'ふつう',sub:'ミスなく走って互角',v:4},h:{name:'つよい',sub:'完璧に走って互角',v:8}};
+var LV={e:{name:'やさしい',sub:'好スタートなら勝てる',v:0,r:30},n:{name:'ふつう',sub:'ミスなく走って互角',v:4,r:38},h:{name:'つよい',sub:'出遅れたら勝てない',v:8,r:46}};
 var cfg={pre:'d',lv:'e',code:'',codeMsg:'',stats:null,name:'あなた',view:'fp',course:0,tilt:-.5,free:false};
 var VIEWS={fp:{n:'目線',pit:.1,z:11.6,back:5.5,F:.34,cy:.56,rate:12,roll:.085},back:{n:'後ろ',pit:.25,z:27,back:70,F:.46,cy:.5,rate:4.5,roll:.045},high:{n:'上空',pit:.5,z:100,back:135,F:.5,cy:.5,rate:3.5,roll:.02}},VORD=['fp','back','high'];
 var G=null,inp={steer:0,lever:0},raf=0,last=0,cv=null,cx=null,W=0,H=0;
@@ -545,7 +546,7 @@ function wheel(){
 /* ---------- 友達とのリアルタイム対戦（最大6人。中継用データベースを通すのでVPNでも通る） ---------- */
 var MAXP=6;
 var NET={role:null,code:'',me:'',host:'h',j:0,peers:{},msg:'',last:0,busy:false,auto:0,copied:'',linked:false,ready:false,startId:0,first:true,wr:false,es:null};
-var VERSION='1117-2102',newer='';
+var VERSION='1117-2132',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL */
@@ -989,7 +990,7 @@ function pt(e){return rot?[e.clientY,PW-e.clientX]:[e.clientX,e.clientY];}
 function start(o){
   o=o||{};if(o.rps){NET.ready=false;NET.auto=0;for(var pid in NET.peers)NET.peers[pid].ready=false;}
   var cs=curStats(),avg=(cs.st+cs.tn+cs.mt+cs.mn)/4;
-  G=newRace({stats:cs,aiSpeed:164+(avg-45)*.46+LV[cfg.lv].v,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rps:o.rps,aiDefs:o.aiDefs});G.menu=false;inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
+  G=newRace({stats:cs,aiSpeed:164+(avg-45)*.46+LV[cfg.lv].v,rmin:LV[cfg.lv].r,course:o.my||cfg.course||(cfg.free?3:0),tilt:cfg.tilt,free:cfg.free,rps:o.rps,aiDefs:o.aiDefs});G.menu=false;inp.steer=0;inp.lever=0;ptr={};if(!SC)SC=buildScene();
   show(vRace());document.body.classList.add('racing');cv=document.getElementById('cv');glcv=document.getElementById('gl');
   GLR=/[?&]flat=1/.test(location.search)?null:glInit(glcv);
   if(GLR){cv.style.background='transparent';}else{glcv.style.display='none';glcv=null;}
