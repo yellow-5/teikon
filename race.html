@@ -546,7 +546,7 @@ function wheel(){
 /* ---------- 友達とのリアルタイム対戦（最大6人。中継用データベースを通すのでVPNでも通る） ---------- */
 var MAXP=6;
 var NET={role:null,code:'',me:'',host:'h',j:0,peers:{},msg:'',last:0,busy:false,auto:0,copied:'',linked:false,ready:false,startId:0,first:true,wr:false,es:null};
-var VERSION='1117-2132',newer='';
+var VERSION='1117-2153',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL */
@@ -784,6 +784,11 @@ function buildBoat(no,part){
     M.quad([-3,-6.2,2.84],[-11,-6.2,2.84],[-11,-3.6,2.84],[-3,-3.6,2.84],[1,1,1],[0,0,1]);M.quad([-3,6.2,2.84],[-11,6.2,2.84],[-11,3.6,2.84],[-3,3.6,2.84],[1,1,1],[0,0,1]);
   }else{
     var suit=no===1?[.95,.96,.96]:c;
+    if(part==='helmet'&&HUM){var hc=HUM.hc,hr=HUM.hr;
+      M.sphere(hc[0],hc[1],hc[2],hr,function(z){return z>.25?(no===1?[.8,.84,.87]:c):z<-.6?[.18,.2,.24]:[.96,.97,.97];},1.1);
+      M.quad([hc[0]+hr*.93,hc[1]-hr*.62,hc[2]-hr*.28],[hc[0]+hr*.93,hc[1]+hr*.62,hc[2]-hr*.28],[hc[0]+hr*1.02,hc[1]+hr*.58,hc[2]+hr*.2],[hc[0]+hr*1.02,hc[1]-hr*.58,hc[2]+hr*.2],[.08,.12,.17],[1,0,0]);
+      return new Float32Array(M.v);}
+    if(part==='rider'){
     /* 選手 */
     var T=[[-3.6,-2.5,3],[-3.6,2.5,3],[-1.0,2.5,3],[-1.0,-2.5,3]],U=[[-2.9,-2.1,8.6],[-2.9,2.1,8.6],[-.9,2.1,8.6],[-.9,-2.1,8.6]],tc0=[-2.2,0,5.8];
     for(i=0;i<4;i++)M.quad(T[i],T[(i+1)%4],U[(i+1)%4],U[i],suit,null,tc0);
@@ -791,12 +796,41 @@ function buildBoat(no,part){
     M.quad([-3.7,-2.5,3],[-3.7,2.5,3],[-3.65,2.4,4.8],[-3.65,-2.4,4.8],[.07,.13,.18],[-1,0,0]);
     M.sphere(-1.7,0,10.5,2.35,function(z){return z>.25?(no===1?[.78,.82,.85]:c):z<-.55?[.2,.24,.28]:[.96,.97,.97];},1.08);
     M.quad([-.2,-1.5,10.2],[-.2,1.5,10.2],[-.1,1.4,11.3],[-.1,-1.4,11.3],[.12,.18,.24],[1,0,0]);
+    }
     /* モーター */
     M.box(-15.5,-11,-2.3,2.3,2.9,7,[.17,.22,.27]);
     M.quad([-15.5,-2.3,7.05],[-11,-2.3,7.05],[-11,2.3,7.05],[-15.5,2.3,7.05],[.93,.95,.96],[0,0,1]);
     M.quad([-15.7,-1.6,4.1],[-15.7,1.6,4.1],[-15.7,1.6,6.3],[-15.7,-1.6,6.3],c,[-1,0,0]);
   }
   return new Float32Array(M.v);
+}
+var HUM=null,HUMLOAD=0;
+/* 選手の3Dモデル（Quaternius「Universal Base Characters」CC0 を、艇に乗る姿勢に固めたもの） */
+function loadHuman(){
+  if(HUMLOAD)return;HUMLOAD=1;
+  try{fetch('rider.bin?v='+VERSION).then(function(r){if(!r.ok)throw 0;return r.arrayBuffer();}).then(function(ab){
+    var dv=new DataView(ab);if(dv.getUint8(0)!==84||dv.getUint8(3)!==49)return;
+    var nv=dv.getUint32(4,true),ni=dv.getUint32(8,true),o=28;
+    var pos=new Float32Array(ab.slice(o,o+nv*12));o+=nv*12;
+    var nq=new Int8Array(ab.slice(o,o+nv*3));o+=nv*3;
+    var reg=new Uint8Array(ab.slice(o,o+nv));o+=nv;o+=o%2;
+    var idx=new Uint16Array(ab.slice(o,o+ni*2));
+    var nrm=new Float32Array(nv*3);for(var i=0;i<nv*3;i++)nrm[i]=nq[i]/127;
+    HUM={nv:nv,ni:ni,pos:pos,nrm:nrm,reg:reg,idx:idx,hc:[dv.getFloat32(12,true),dv.getFloat32(16,true),dv.getFloat32(20,true)],hr:dv.getFloat32(24,true)};
+    if(GLR){humBuffers(GLR);if(G&&cv)try{draw(1/60);}catch(e){}}
+  }).catch(function(){});}catch(e){}
+}
+function humBuffers(R){
+  if(!HUM||R.hum)return;var gl=R.gl;
+  function b(t,d){var x=gl.createBuffer();gl.bindBuffer(t,x);gl.bufferData(t,d,gl.STATIC_DRAW);return x;}
+  var H={p:b(gl.ARRAY_BUFFER,HUM.pos),n:b(gl.ARRAY_BUFFER,HUM.nrm),i:b(gl.ELEMENT_ARRAY_BUFFER,HUM.idx),c:[],helm:[],motor:[]};
+  for(var no=1;no<=6;no++){var c=hex01(COL[no-1]);if(no===1)c=[.95,.96,.96];if(no===2)c=[.16,.18,.21];
+    var cc=new Float32Array(HUM.nv*3),RC=[c,[.13,.13,.15],[.2,.2,.23],c];
+    for(var v=0;v<HUM.nv;v++){var q=RC[HUM.reg[v]]||c;cc[v*3]=q[0];cc[v*3+1]=q[1];cc[v*3+2]=q[2];}
+    H.c.push(b(gl.ARRAY_BUFFER,cc));
+    var hm=buildBoat(no,'helmet');H.helm.push({b:b(gl.ARRAY_BUFFER,hm),n:hm.length/9});
+    var mo=buildBoat(no,'motor');H.motor.push({b:b(gl.ARRAY_BUFFER,mo),n:mo.length/9});}
+  R.hum=H;
 }
 function glInit(canvas){
   var gl=null;try{gl=canvas.getContext('webgl',{antialias:true,alpha:false,depth:true,powerPreference:'high-performance'});}catch(e){}
@@ -833,7 +867,7 @@ function glInit(canvas){
   R.hull=[];R.rider=[];for(var n=1;n<=6;n++){var h=buildBoat(n,'hull'),r=buildBoat(n,'rider');R.hull.push({b:buf(h),n:h.length/9});R.rider.push({b:buf(r),n:r.length/9});}
   R.wat=buf(new Float32Array([-WX-9,-WY-9,0, WX+9,-WY-9,0, WX+9,WY+9,0, -WX-9,-WY-9,0, WX+9,WY+9,0, -WX-9,WY+9,0]));
   var S=5000,cu=[];[[0,1,2],[0,2,1],[1,2,0]].forEach(function(ax){[-1,1].forEach(function(sg){var q=[[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]];q.forEach(function(t){var v=[0,0,0];v[ax[0]]=sg*S;v[ax[1]]=t[0]*S;v[ax[2]]=t[1]*S;cu.push(v[0],v[1],v[2]);});});});
-  R.cube=buf(new Float32Array(cu));R.dyn=buf(null,true);R.t0=performance.now();
+  R.cube=buf(new Float32Array(cu));loadHuman();if(HUM)humBuffers(R);R.dyn=buf(null,true);R.t0=performance.now();
   return R;
 }
 var VPM=null;
@@ -860,7 +894,13 @@ function renderGL(hh,fp){
     gl.vertexAttribPointer(M.aP,3,gl.FLOAT,false,36,0);gl.vertexAttribPointer(M.aN,3,gl.FLOAT,false,36,12);gl.vertexAttribPointer(M.aC,3,gl.FLOAT,false,36,24);}
   gl.uniformMatrix4fv(M.uM,false,ID);bindMesh(R.stat);gl.drawArrays(gl.TRIANGLES,0,R.statN);
   function boat(x,y,h,no,lean,rider){var c=Math.cos(h),s=Math.sin(h),m=new Float32Array([c,s,0,0,-s,c,lean*.11,0,0,0,1,0,x,y,0,1]);gl.uniformMatrix4fv(M.uM,false,m);
-    bindMesh(R.hull[no-1].b);gl.drawArrays(gl.TRIANGLES,0,R.hull[no-1].n);if(rider){bindMesh(R.rider[no-1].b);gl.drawArrays(gl.TRIANGLES,0,R.rider[no-1].n);}}
+    bindMesh(R.hull[no-1].b);gl.drawArrays(gl.TRIANGLES,0,R.hull[no-1].n);if(!rider)return;
+    var H=R.hum;if(!H){bindMesh(R.rider[no-1].b);gl.drawArrays(gl.TRIANGLES,0,R.rider[no-1].n);return;}
+    bindMesh(H.motor[no-1].b);gl.drawArrays(gl.TRIANGLES,0,H.motor[no-1].n);bindMesh(H.helm[no-1].b);gl.drawArrays(gl.TRIANGLES,0,H.helm[no-1].n);
+    gl.bindBuffer(gl.ARRAY_BUFFER,H.p);gl.vertexAttribPointer(M.aP,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,H.n);gl.vertexAttribPointer(M.aN,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ARRAY_BUFFER,H.c[no-1]);gl.vertexAttribPointer(M.aC,3,gl.FLOAT,false,0,0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,H.i);gl.drawElements(gl.TRIANGLES,HUM.ni,gl.UNSIGNED_SHORT,0);}
   G.ai.forEach(function(a){boat(a.x,a.y,a.h,a.no,0,true);});
   G.rps.forEach(function(r){if(!r.gone)boat(r.x,r.y,r.h,r.no,(r.steer||0)*1.6,true);});
   boat(p.x,p.y,p.h,G.my,(p.steer||0)*1.6,!fp);

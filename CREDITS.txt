@@ -1,0 +1,4 @@
+3Dモデル（選手の体）
+  Universal Base Characters [Standard] by Quaternius (https://quaternius.com)
+  License: CC0 1.0 Universal
+  rider.bin は、このモデルを艇に乗る姿勢に固めたもの（tools-rider-bake.py で作成）
