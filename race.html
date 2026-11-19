@@ -101,7 +101,7 @@ function newRace(cfg){
   var run0=my<=3?170:330;
   var G={t:free?0:T0,my:my,ai:ai,over:false,finished:false,free:free,lapN:-1,lapStart:0,lastLap:null,bestLap:null,flying:false,late:false,stTime:free?0:null,finTime:null,place:null,msg:'',msgT:0,run:run0,
     p:{x:-run0,y:RR+(my-1)*LS,h:0,vF:0,vL:0,tot:-run0,prev:LAP-run0,
-       vmax:(150+st.mt*.45)*(1+tl*.045),acc:(.8+st.st*.012)*(1-tl*.1),turn:(1.2+st.tn*.012)*(1-tl*.05),grip:(2+st.tn*.025)*(1-tl*.04),wake:.66+st.mn*.0014,rmin:cfg.rmin||38,bump:.85+st.mn*.001},
+       vmax:(150+st.mt*.45)*(1+tl*.045),acc:(.8+st.st*.012)*(1-tl*.1),turn:(1.2+st.tn*.012)*(1-tl*.07),grip:(2+st.tn*.025)*(1-tl*.04),wake:.66+st.mn*.0014,rmin:(cfg.rmin||38)*(1+tl*.1),tl:tl,bump:.85+st.mn*.001},
     trail:[]};
   G.pass=[];G.turnT=0;G.exitAt=null;G.wasT=false;G.t1=false;G.cut=null;
   G.remoteAI=!!cfg.aiDefs;
@@ -124,7 +124,16 @@ function step(G,dt,inp){
   else G.ai.forEach(function(a){
     var idx=order.indexOf(a),sg=seg(a.tot),first=a.tot<D+Math.PI*RR+40,tg,K=1;
     if(a.tot<D*.3)tg=(a.no-1)*LS;
-    else if(first){tg=LINES[a.line];}
+    else if(first){
+      if(!a.dec){a.dec=1;
+        var inner=null,me2=a.no;G.ai.forEach(function(o){if(o.no===me2-1)inner=o.tot;});
+        if(G.my===me2-1)inner=p.tot;G.rps.forEach(function(r){if(r.no===me2-1)inner=r.tot;});
+        var lead=inner===null?0:a.tot-inner;G.mkN=G.mkN||0;
+        if(me2===1)a.line='in';
+        else if(lead>14&&G.mkN<2){a.line=(me2>=4&&lead<28)?'mz':'makuri';G.mkN++;}
+        else if(lead>-6&&me2>=3&&Math.random()<.3)a.line='mz';
+        else a.line='sashi';}
+      tg=LINES[a.line];}
     else tg=6+idx*19;
     if(inTurn(a.tot)&&a.tot>0)K=Kof(a.off);
     /* 前の相手の引き波・自分の艇をよける */
@@ -168,7 +177,7 @@ function step(G,dt,inp){
   /* 速いほど曲がりにくい：握ったままだと大きく回り、落とすと小さく回れる */
   var tf=1-.36*clamp((p.vF-.5*lim)/(.5*lim),0,1);
   /* 艇が回れる半径には限りがある（マークぎりぎりを小さく回る近道は効きにくい） */
-  if(Math.abs(steer)>.02){p.h+=steer*Math.min(p.turn*tf*(1+.45*(1-lev))*clamp(p.vF/60,.25,1),Math.max(p.vF,25)/p.rmin)*dt;p.vF-=p.vF*(.8-.74*lev)*Math.abs(steer)*dt;}
+  if(Math.abs(steer)>.02){p.h+=steer*Math.min(p.turn*tf*(1+.45*(1-lev))*clamp(p.vF/60,.25,1),Math.max(p.vF,25)/(p.rmin+p.tl*p.vF*.1))*dt;p.vF-=p.vF*(.8-.74*lev)*Math.abs(steer)*dt;}
   /* 向きを変えた分だけ横滑りが残る */
   var c=Math.cos(p.h),s=Math.sin(p.h),vx=p.vx||0,vy=p.vy||0,f=vx*c+vy*s,l=-vx*s+vy*c;
   f+=(p.vF-f)*Math.min(1,dt*6);l*=Math.exp(-p.grip*dt);
@@ -546,7 +555,7 @@ function wheel(){
 /* ---------- 友達とのリアルタイム対戦（最大6人。中継用データベースを通すのでVPNでも通る） ---------- */
 var MAXP=6;
 var NET={role:null,code:'',me:'',host:'h',j:0,peers:{},msg:'',last:0,busy:false,auto:0,copied:'',linked:false,ready:false,startId:0,first:true,wr:false,es:null};
-var VERSION='1117-2206',newer='';
+var VERSION='1119-1004',newer='';
 function checkVersion(){try{fetch('version.txt?'+Date.now(),{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){t=String(t||'').trim();if(t&&t!==VERSION){newer=t;if(!document.body.classList.contains('racing'))show(vTitle());}}).catch(function(){});}catch(e){}}
 function reloadFresh(){var q=[];var rm=/[?&]room=(\d{4})/.exec(location.search);if(NET.code&&NET.role==='guest')q.push('room='+NET.code);else if(rm)q.push('room='+rm[1]);q.push('v='+Date.now());location.replace(location.pathname+'?'+q.join('&'));}
 var FB_URL='https://teikon-race-default-rtdb.asia-southeast1.firebasedatabase.app'; /* 中継用データベースのURL */
